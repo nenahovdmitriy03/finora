@@ -1,0 +1,368 @@
+package com.finora.presentation.addtransaction
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.finora.domain.model.TransactionType
+import com.finora.presentation.AppViewModelProvider
+import com.finora.presentation.components.IconChip
+import com.finora.presentation.theme.LocalFinoraColors
+import com.finora.presentation.util.formatFullDate
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddTransactionScreen(
+    transactionId: Long,
+    onDone: () -> Unit,
+    viewModel: AddTransactionViewModel = viewModel(factory = AppViewModelProvider.Factory)
+) {
+    val accounts by viewModel.accounts.collectAsStateWithLifecycle()
+    val categories by viewModel.categories.collectAsStateWithLifecycle()
+    val colors = LocalFinoraColors.current
+
+    LaunchedEffect(transactionId) { viewModel.load(transactionId) }
+    LaunchedEffect(accounts) { viewModel.ensureDefaultAccount() }
+
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    val visibleCategories = categories.filter { it.type == viewModel.type }
+    val isEditing = viewModel.editingId != null
+
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            TopAppBar(
+                title = { Text(if (isEditing) "Редактировать" else "Новая операция") },
+                navigationIcon = {
+                    IconButton(onClick = onDone) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Назад")
+                    }
+                },
+                actions = {
+                    if (isEditing) {
+                        IconButton(onClick = { viewModel.delete(onDone) }) {
+                            Icon(
+                                Icons.Rounded.DeleteOutline,
+                                contentDescription = "Удалить",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                )
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 32.dp)
+        ) {
+            // Type toggle
+            TypeToggle(
+                type = viewModel.type,
+                onChange = viewModel::setType,
+                incomeColor = colors.income,
+                expenseColor = colors.expense
+            )
+            Spacer(Modifier.height(20.dp))
+
+            // Amount
+            AmountField(
+                value = viewModel.amountText,
+                onValueChange = viewModel::setAmount,
+                accent = if (viewModel.type == TransactionType.INCOME) colors.income else colors.expense
+            )
+            Spacer(Modifier.height(24.dp))
+
+            // Category
+            Text(
+                "Категория",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(10.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                visibleCategories.forEach { category ->
+                    CategoryChip(
+                        name = category.name,
+                        iconKey = category.iconKey,
+                        color = Color(category.color),
+                        selected = viewModel.categoryId == category.id,
+                        onClick = { viewModel.setCategory(category.id) }
+                    )
+                }
+            }
+            Spacer(Modifier.height(24.dp))
+
+            // Account
+            Text(
+                "Счёт",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(10.dp))
+            if (accounts.isEmpty()) {
+                Text(
+                    "Сначала создайте счёт во вкладке «Счета».",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error
+                )
+            } else {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    accounts.forEach { account ->
+                        CategoryChip(
+                            name = account.name,
+                            iconKey = account.iconKey,
+                            color = Color(account.color),
+                            selected = viewModel.accountId == account.id,
+                            onClick = { viewModel.setAccount(account.id) }
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(24.dp))
+
+            // Date
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(MaterialTheme.shapes.medium)
+                    .background(MaterialTheme.colorScheme.surface)
+                    .clickable { showDatePicker = true }
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Rounded.CalendarMonth,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.width(12.dp))
+                Text("Дата", modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onBackground)
+                Text(
+                    formatFullDate(viewModel.dateMillis),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+
+            // Note
+            OutlinedTextField(
+                value = viewModel.note,
+                onValueChange = viewModel::setNote,
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("Комментарий (необязательно)") },
+                shape = MaterialTheme.shapes.medium,
+                singleLine = true
+            )
+            Spacer(Modifier.height(28.dp))
+
+            Button(
+                onClick = { viewModel.save(onDone) },
+                enabled = viewModel.canSave,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(54.dp),
+                shape = MaterialTheme.shapes.large,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+            ) {
+                Icon(Icons.Rounded.Check, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(if (isEditing) "Сохранить" else "Добавить", style = MaterialTheme.typography.titleMedium)
+            }
+        }
+    }
+
+    if (showDatePicker) {
+        val dateState = rememberDatePickerState(initialSelectedDateMillis = viewModel.dateMillis)
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    dateState.selectedDateMillis?.let { viewModel.setDate(it) }
+                    showDatePicker = false
+                }) { Text("Готово") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("Отмена") }
+            }
+        ) {
+            DatePicker(state = dateState)
+        }
+    }
+}
+
+@Composable
+private fun TypeToggle(
+    type: TransactionType,
+    onChange: (TransactionType) -> Unit,
+    incomeColor: Color,
+    expenseColor: Color
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.large)
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(4.dp)
+    ) {
+        ToggleHalf(
+            label = "Расход",
+            selected = type == TransactionType.EXPENSE,
+            selectedColor = expenseColor,
+            modifier = Modifier.weight(1f)
+        ) { onChange(TransactionType.EXPENSE) }
+        ToggleHalf(
+            label = "Доход",
+            selected = type == TransactionType.INCOME,
+            selectedColor = incomeColor,
+            modifier = Modifier.weight(1f)
+        ) { onChange(TransactionType.INCOME) }
+    }
+}
+
+@Composable
+private fun ToggleHalf(
+    label: String,
+    selected: Boolean,
+    selectedColor: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .clip(MaterialTheme.shapes.medium)
+            .background(if (selected) selectedColor else Color.Transparent)
+            .clickable { onClick() }
+            .padding(vertical = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun AmountField(value: String, onValueChange: (String) -> Unit, accent: Color) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            placeholder = {
+                Text(
+                    "0",
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.displaySmall.copy(fontSize = 40.sp)
+                )
+            },
+            textStyle = MaterialTheme.typography.displaySmall.copy(
+                fontSize = 40.sp,
+                textAlign = TextAlign.Center,
+                color = accent
+            ),
+            suffix = { Text("  ₽", style = MaterialTheme.typography.titleLarge) },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large
+        )
+    }
+}
+
+@Composable
+private fun CategoryChip(
+    name: String,
+    iconKey: String,
+    color: Color,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .clip(MaterialTheme.shapes.large)
+            .background(if (selected) color.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surface)
+            .border(
+                width = if (selected) 1.5.dp else 1.dp,
+                color = if (selected) color else MaterialTheme.colorScheme.outline,
+                shape = MaterialTheme.shapes.large
+            )
+            .clickable { onClick() }
+            .padding(start = 8.dp, end = 14.dp, top = 7.dp, bottom = 7.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconChip(iconKey = iconKey, color = color, size = 30.dp)
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = name,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+    }
+}

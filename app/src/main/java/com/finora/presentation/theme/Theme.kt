@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import com.finora.domain.model.AccentColor
 
 /** Extra semantic colors not covered by Material's [androidx.compose.material3.ColorScheme]. */
 data class FinoraColors(
@@ -24,11 +25,11 @@ val LocalFinoraColors = staticCompositionLocalOf {
     FinoraColors(income = IncomeGreen, expense = ExpenseRed, cardElevated = LightSurface)
 }
 
-private val LightColors = lightColorScheme(
-    primary = Violet,
+private fun lightColors(accent: AccentColor) = lightColorScheme(
+    primary = Color(accent.seed),
     onPrimary = Color.White,
-    primaryContainer = VioletSoft,
-    onPrimaryContainer = VioletDark,
+    primaryContainer = Color(accent.container),
+    onPrimaryContainer = Color(accent.seedDark),
     secondary = IncomeGreen,
     onSecondary = Color.White,
     background = LightBackground,
@@ -42,10 +43,10 @@ private val LightColors = lightColorScheme(
     error = ExpenseRed
 )
 
-private val DarkColors = darkColorScheme(
-    primary = Violet,
+private fun darkColors(accent: AccentColor) = darkColorScheme(
+    primary = Color(accent.seed),
     onPrimary = Color.White,
-    primaryContainer = VioletDark,
+    primaryContainer = Color(accent.seedDark),
     onPrimaryContainer = Color.White,
     secondary = IncomeGreen,
     onSecondary = Color.White,
@@ -63,9 +64,10 @@ private val DarkColors = darkColorScheme(
 @Composable
 fun FinoraTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    accent: AccentColor = AccentColor.VIOLET,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColors else LightColors
+    val colorScheme = if (darkTheme) darkColors(accent) else lightColors(accent)
     val finoraColors = FinoraColors(
         income = IncomeGreen,
         expense = ExpenseRed,

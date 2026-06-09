@@ -8,8 +8,8 @@ val VioletDark = Color(0xFF5A4FD6)
 val VioletSoft = Color(0xFFEDEBFE)
 
 // Semantic
-val IncomeGreen = Color(0xFF00B894)
-val ExpenseRed = Color(0xFFE74C5E)
+val IncomeGreen = Color(0xFF3FB18C)
+val ExpenseRed = Color(0xFFE07685)
 
 // Light scheme
 val LightBackground = Color(0xFFF6F6FB)

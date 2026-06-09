@@ -98,10 +98,21 @@ class FinanceRepository(private val db: AppDatabase) {
     suspend fun updateGoal(goal: Goal) { goalDao.upsert(goal.toEntity()) }
     suspend fun deleteGoal(goal: Goal) = goalDao.delete(goal.toEntity())
 
-    suspend fun contributeToGoal(goalId: Long, amount: Double) {
+    /**
+     * Moves [amount] between a goal and an account.
+     *  - amount > 0 → deposit into goal, debited from [accountId].
+     *  - amount < 0 → withdraw from goal, credited back to [accountId].
+     * The goal's saved amount never goes below 0, and the account balance is
+     * adjusted by exactly the realized delta (so money is moved, not created).
+     */
+    suspend fun contributeToGoal(goalId: Long, accountId: Long, amount: Double) {
         val goal = goalDao.getById(goalId)?.toDomain() ?: return
-        val updated = goal.copy(savedAmount = (goal.savedAmount + amount).coerceAtLeast(0.0))
-        goalDao.upsert(updated.toEntity())
+        val account = accountDao.getById(accountId)?.toDomain() ?: return
+        val newSaved = (goal.savedAmount + amount).coerceAtLeast(0.0)
+        val realized = newSaved - goal.savedAmount
+        if (realized == 0.0) return
+        goalDao.upsert(goal.copy(savedAmount = newSaved).toEntity())
+        accountDao.upsert(account.copy(initialBalance = account.initialBalance - realized).toEntity())
     }
 
     // ---- Seeding ----
@@ -115,7 +126,7 @@ class FinanceRepository(private val db: AppDatabase) {
                     name = "Наличные",
                     type = com.finora.domain.model.AccountType.CASH,
                     initialBalance = 0.0,
-                    color = 0xFF00B894,
+                    color = 0xFF3FB18C,
                     iconKey = "cash"
                 ).toEntity()
             )

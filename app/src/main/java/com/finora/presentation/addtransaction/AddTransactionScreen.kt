@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -61,9 +62,11 @@ import com.finora.presentation.AppViewModelProvider
 import com.finora.presentation.components.IconChip
 import com.finora.presentation.theme.LocalFinoraColors
 import com.finora.presentation.util.ThousandsVisualTransformation
+import com.finora.presentation.util.expenseIconKeys
 import com.finora.presentation.util.formatFullDate
+import com.finora.presentation.util.incomeIconKeys
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun AddTransactionScreen(
     transactionId: Long,
@@ -78,8 +81,11 @@ fun AddTransactionScreen(
     LaunchedEffect(accounts) { viewModel.ensureDefaultAccount() }
 
     var showDatePicker by remember { mutableStateOf(false) }
+    var showCategoryPicker by remember { mutableStateOf(false) }
 
     val visibleCategories = categories.filter { it.type == viewModel.type }
+    val selectedCategory = visibleCategories.firstOrNull { it.id == viewModel.categoryId }
+    val accentColor = if (viewModel.type == TransactionType.INCOME) colors.income else colors.expense
     val isEditing = viewModel.editingId != null
 
     Scaffold(
@@ -119,7 +125,7 @@ fun AddTransactionScreen(
             // Type toggle
             TypeToggle(
                 type = viewModel.type,
-                onChange = viewModel::setType,
+                onChange = viewModel::updateType,
                 incomeColor = colors.income,
                 expenseColor = colors.expense
             )
@@ -133,26 +139,44 @@ fun AddTransactionScreen(
             )
             Spacer(Modifier.height(24.dp))
 
-            // Category
+            // Category — opens a dedicated full-screen picker
             Text(
                 "Категория",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(10.dp))
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(MaterialTheme.shapes.medium)
+                    .background(MaterialTheme.colorScheme.surface)
+                    .clickable { showCategoryPicker = true }
+                    .padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                visibleCategories.forEach { category ->
-                    CategoryChip(
-                        name = category.name,
-                        iconKey = category.iconKey,
-                        color = Color(category.color),
-                        selected = viewModel.categoryId == category.id,
-                        onClick = { viewModel.setCategory(category.id) }
+                if (selectedCategory != null) {
+                    IconChip(iconKey = selectedCategory.iconKey, color = Color(selectedCategory.color), size = 38.dp)
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        selectedCategory.name,
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                } else {
+                    Text(
+                        "Выберите категорию",
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                Text(
+                    "Изменить",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
             Spacer(Modifier.height(24.dp))
 
@@ -212,7 +236,7 @@ fun AddTransactionScreen(
             // Note
             OutlinedTextField(
                 value = viewModel.note,
-                onValueChange = viewModel::setNote,
+                onValueChange = viewModel::updateNote,
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text("Комментарий (необязательно)") },
                 shape = MaterialTheme.shapes.medium,
@@ -252,6 +276,18 @@ fun AddTransactionScreen(
         ) {
             DatePicker(state = dateState)
         }
+    }
+
+    if (showCategoryPicker) {
+        CategoryPickerDialog(
+            categories = visibleCategories,
+            selectedId = viewModel.categoryId,
+            iconKeys = if (viewModel.type == TransactionType.INCOME) incomeIconKeys else expenseIconKeys,
+            accent = accentColor,
+            onSelect = { id -> viewModel.setCategory(id) },
+            onCreate = { name, icon, color -> viewModel.createCategory(name, icon, color) },
+            onDismiss = { showCategoryPicker = false }
+        )
     }
 }
 

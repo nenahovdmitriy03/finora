@@ -8,7 +8,7 @@ object DefaultData {
 
     fun categories(): List<CategoryEntity> = listOf(
         // Expenses
-        cat("Продукты", "cart", 0xFF00B894),
+        cat("Продукты", "cart", 0xFF3FB18C),
         cat("Кафе и рестораны", "restaurant", 0xFFE17055),
         cat("Транспорт", "car", 0xFF0984E3),
         cat("Жильё", "home", 0xFF6C5CE7),
@@ -19,12 +19,17 @@ object DefaultData {
         cat("Образование", "school", 0xFF6C5CE7),
         cat("Путешествия", "flight", 0xFF0984E3),
         cat("Подписки", "subscription", 0xFFA29BFE),
+        cat("Игры", "games", 0xFF6C5CE7),
+        cat("Питомцы", "pets", 0xFFFAB1A0),
+        cat("Счета и платежи", "bills", 0xFF74B9FF),
+        cat("Подарки", "gift", 0xFFE84393),
         cat("Прочее", "category", 0xFFB2BEC3),
         // Income
-        cat("Зарплата", "salary", 0xFF00B894, TransactionType.INCOME),
+        cat("Зарплата", "salary", 0xFF3FB18C, TransactionType.INCOME),
         cat("Подработка", "work", 0xFF00CEC9, TransactionType.INCOME),
         cat("Подарок", "gift", 0xFFE84393, TransactionType.INCOME),
         cat("Инвестиции", "invest", 0xFFFDCB6E, TransactionType.INCOME),
+        cat("Кэшбэк", "savings", 0xFF00CEC9, TransactionType.INCOME),
         cat("Прочее", "category", 0xFFB2BEC3, TransactionType.INCOME)
     )
 

@@ -48,7 +48,7 @@ class AddTransactionViewModel(private val repository: FinanceRepository) : ViewM
     val canSave: Boolean
         get() = amount > 0.0 && accountId != null
 
-    fun setType(value: TransactionType) {
+    fun updateType(value: TransactionType) {
         if (type != value) {
             type = value
             categoryId = null
@@ -61,7 +61,24 @@ class AddTransactionViewModel(private val repository: FinanceRepository) : ViewM
 
     fun setAccount(id: Long) { accountId = id }
     fun setCategory(id: Long?) { categoryId = id }
-    fun setNote(value: String) { note = value }
+
+    /** Creates a custom category of the current [type] and selects it. */
+    fun createCategory(name: String, iconKey: String, color: Long) {
+        if (name.isBlank()) return
+        viewModelScope.launch {
+            val id = repository.addCategory(
+                Category(
+                    name = name.trim(),
+                    type = type,
+                    iconKey = iconKey,
+                    color = color,
+                    isDefault = false
+                )
+            )
+            categoryId = id
+        }
+    }
+    fun updateNote(value: String) { note = value }
     fun setDate(millis: Long) { dateMillis = millis }
 
     fun load(id: Long) {

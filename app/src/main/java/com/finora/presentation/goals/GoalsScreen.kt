@@ -1,13 +1,18 @@
 package com.finora.presentation.goals
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -28,11 +33,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.finora.domain.model.AccountBalance
 import com.finora.domain.model.Goal
 import com.finora.presentation.AppViewModelProvider
 import com.finora.presentation.components.ColorPickerRow
@@ -51,6 +58,7 @@ fun GoalsScreen(
     viewModel: GoalsViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
     val goals by viewModel.goals.collectAsStateWithLifecycle()
+    val accounts by viewModel.accounts.collectAsStateWithLifecycle()
     var editorGoal by remember { mutableStateOf<Goal?>(null) }
     var showEditor by remember { mutableStateOf(false) }
     var contributeGoal by remember { mutableStateOf<Goal?>(null) }
@@ -118,9 +126,10 @@ fun GoalsScreen(
     contributeGoal?.let { goal ->
         ContributeDialog(
             goal = goal,
+            accounts = accounts,
             onDismiss = { contributeGoal = null },
-            onConfirm = { delta ->
-                viewModel.contribute(goal.id, delta)
+            onConfirm = { accountId, delta ->
+                viewModel.contribute(goal.id, accountId, delta)
                 contributeGoal = null
             }
         )
@@ -236,13 +245,19 @@ private fun GoalEditorDialog(
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ContributeDialog(
     goal: Goal,
+    accounts: List<AccountBalance>,
     onDismiss: () -> Unit,
-    onConfirm: (Double) -> Unit
+    onConfirm: (accountId: Long, delta: Double) -> Unit
 ) {
     var amount by remember { mutableStateOf("") }
+    var selectedAccountId by remember(accounts) { mutableStateOf(accounts.firstOrNull()?.account?.id) }
+    val parsed = amount.replace(',', '.').toDoubleOrNull() ?: 0.0
+    val ready = parsed > 0.0 && selectedAccountId != null
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Пополнить «${goal.name}»") },
@@ -260,21 +275,84 @@ private fun ContributeDialog(
                     label = "Сумма",
                     modifier = Modifier.fillMaxWidth()
                 )
+                Spacer(Modifier.height(14.dp))
+                if (accounts.isEmpty()) {
+                    Text(
+                        "Сначала создайте счёт: Настройки → Мои счета.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                } else {
+                    Text(
+                        "Со счёта",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        accounts.forEach { ab ->
+                            AccountPill(
+                                title = ab.account.name,
+                                subtitle = formatMoney(ab.balance),
+                                color = Color(ab.account.color),
+                                selected = selectedAccountId == ab.account.id,
+                                onClick = { selectedAccountId = ab.account.id }
+                            )
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
             TextButton(
-                onClick = { onConfirm(amount.replace(',', '.').toDoubleOrNull() ?: 0.0) },
-                enabled = (amount.replace(',', '.').toDoubleOrNull() ?: 0.0) > 0.0
-            ) { Text("Добавить") }
+                onClick = { selectedAccountId?.let { onConfirm(it, parsed) } },
+                enabled = ready
+            ) { Text("Пополнить") }
         },
         dismissButton = {
             Row {
-                TextButton(onClick = { onConfirm(-(amount.replace(',', '.').toDoubleOrNull() ?: 0.0)) }) {
-                    Text("Снять")
-                }
+                TextButton(
+                    onClick = { selectedAccountId?.let { onConfirm(it, -parsed) } },
+                    enabled = ready
+                ) { Text("Снять") }
                 TextButton(onClick = onDismiss) { Text("Отмена") }
             }
         }
     )
+}
+
+@Composable
+private fun AccountPill(
+    title: String,
+    subtitle: String,
+    color: Color,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .clip(MaterialTheme.shapes.medium)
+            .background(if (selected) color.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surfaceVariant)
+            .border(
+                width = if (selected) 1.5.dp else 0.dp,
+                color = if (selected) color else Color.Transparent,
+                shape = MaterialTheme.shapes.medium
+            )
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    ) {
+        Text(
+            title,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+        Text(
+            subtitle,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
 }

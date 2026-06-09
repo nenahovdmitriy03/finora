@@ -6,7 +6,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
@@ -20,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.finora.presentation.util.iconForKey
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun IconPickerRow(
     keys: List<String>,
@@ -62,6 +65,7 @@ fun IconPickerRow(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ColorPickerRow(
     colors: List<Long>,

@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -63,7 +64,7 @@ import com.finora.presentation.theme.LocalFinoraColors
 import com.finora.presentation.util.ThousandsVisualTransformation
 import com.finora.presentation.util.formatFullDate
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun AddTransactionScreen(
     transactionId: Long,
@@ -119,7 +120,7 @@ fun AddTransactionScreen(
             // Type toggle
             TypeToggle(
                 type = viewModel.type,
-                onChange = viewModel::setType,
+                onChange = viewModel::updateType,
                 incomeColor = colors.income,
                 expenseColor = colors.expense
             )
@@ -212,7 +213,7 @@ fun AddTransactionScreen(
             // Note
             OutlinedTextField(
                 value = viewModel.note,
-                onValueChange = viewModel::setNote,
+                onValueChange = viewModel::updateNote,
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text("Комментарий (необязательно)") },
                 shape = MaterialTheme.shapes.medium,

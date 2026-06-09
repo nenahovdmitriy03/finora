@@ -48,7 +48,7 @@ class AddTransactionViewModel(private val repository: FinanceRepository) : ViewM
     val canSave: Boolean
         get() = amount > 0.0 && accountId != null
 
-    fun setType(value: TransactionType) {
+    fun updateType(value: TransactionType) {
         if (type != value) {
             type = value
             categoryId = null
@@ -61,7 +61,7 @@ class AddTransactionViewModel(private val repository: FinanceRepository) : ViewM
 
     fun setAccount(id: Long) { accountId = id }
     fun setCategory(id: Long?) { categoryId = id }
-    fun setNote(value: String) { note = value }
+    fun updateNote(value: String) { note = value }
     fun setDate(millis: Long) { dateMillis = millis }
 
     fun load(id: Long) {

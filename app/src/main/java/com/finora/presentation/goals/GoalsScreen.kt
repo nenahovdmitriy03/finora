@@ -30,8 +30,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -43,6 +41,7 @@ import com.finora.presentation.components.FinoraCard
 import com.finora.presentation.components.IconChip
 import com.finora.presentation.components.IconPickerRow
 import com.finora.presentation.components.SectionHeader
+import com.finora.presentation.util.MoneyTextField
 import com.finora.presentation.util.finoraPalette
 import com.finora.presentation.util.formatMoney
 import kotlin.math.roundToInt
@@ -199,12 +198,10 @@ private fun GoalEditorDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(10.dp))
-                OutlinedTextField(
+                MoneyTextField(
                     value = target,
-                    onValueChange = { v -> target = v.filter { it.isDigit() || it == '.' || it == ',' } },
-                    label = { Text("Сумма цели, ₽") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
+                    onValueChange = { target = it },
+                    label = "Сумма цели",
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(14.dp))
@@ -257,12 +254,10 @@ private fun ContributeDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(12.dp))
-                OutlinedTextField(
+                MoneyTextField(
                     value = amount,
-                    onValueChange = { v -> amount = v.filter { it.isDigit() || it == '.' || it == ',' } },
-                    label = { Text("Сумма, ₽") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
+                    onValueChange = { amount = it },
+                    label = "Сумма",
                     modifier = Modifier.fillMaxWidth()
                 )
             }

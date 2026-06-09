@@ -3,6 +3,13 @@ package com.finora.domain.model
 /** Income or expense. */
 enum class TransactionType { INCOME, EXPENSE }
 
+/** App appearance preference. */
+enum class ThemeMode(val title: String) {
+    SYSTEM("Системная"),
+    LIGHT("Светлая"),
+    DARK("Тёмная")
+}
+
 /** Kind of account / bank where money is stored. */
 enum class AccountType(val title: String) {
     CARD("Карта"),

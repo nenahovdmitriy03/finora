@@ -8,6 +8,7 @@ import com.finora.presentation.accounts.AccountsViewModel
 import com.finora.presentation.addtransaction.AddTransactionViewModel
 import com.finora.presentation.goals.GoalsViewModel
 import com.finora.presentation.home.HomeViewModel
+import com.finora.presentation.settings.SettingsViewModel
 import com.finora.presentation.statistics.StatisticsViewModel
 import com.finora.presentation.transactions.TransactionsViewModel
 
@@ -23,5 +24,6 @@ object AppViewModelProvider {
         initializer { StatisticsViewModel(creationApp(this).container.repository) }
         initializer { GoalsViewModel(creationApp(this).container.repository) }
         initializer { AccountsViewModel(creationApp(this).container.repository) }
+        initializer { SettingsViewModel(creationApp(this).container.settings) }
     }
 }

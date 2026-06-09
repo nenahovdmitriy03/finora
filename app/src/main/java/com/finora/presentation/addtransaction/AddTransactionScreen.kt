@@ -60,6 +60,7 @@ import com.finora.domain.model.TransactionType
 import com.finora.presentation.AppViewModelProvider
 import com.finora.presentation.components.IconChip
 import com.finora.presentation.theme.LocalFinoraColors
+import com.finora.presentation.util.ThousandsVisualTransformation
 import com.finora.presentation.util.formatFullDate
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -164,7 +165,7 @@ fun AddTransactionScreen(
             Spacer(Modifier.height(10.dp))
             if (accounts.isEmpty()) {
                 Text(
-                    "Сначала создайте счёт во вкладке «Счета».",
+                    "Сначала создайте счёт: Настройки → Мои счета.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.error
                 )
@@ -328,6 +329,7 @@ private fun AmountField(value: String, onValueChange: (String) -> Unit, accent: 
                 color = accent
             ),
             suffix = { Text("  ₽", style = MaterialTheme.typography.titleLarge) },
+            visualTransformation = remember { ThousandsVisualTransformation() },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),

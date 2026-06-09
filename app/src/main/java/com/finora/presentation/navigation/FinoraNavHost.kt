@@ -34,6 +34,7 @@ import com.finora.presentation.accounts.AccountsScreen
 import com.finora.presentation.addtransaction.AddTransactionScreen
 import com.finora.presentation.goals.GoalsScreen
 import com.finora.presentation.home.HomeScreen
+import com.finora.presentation.settings.SettingsScreen
 import com.finora.presentation.statistics.StatisticsScreen
 import com.finora.presentation.transactions.TransactionsScreen
 
@@ -93,7 +94,14 @@ fun FinoraNavHost(navController: NavHostController = rememberNavController()) {
             }
             composable(Destination.Statistics.route) { StatisticsScreen() }
             composable(Destination.Goals.route) { GoalsScreen() }
-            composable(Destination.Accounts.route) { AccountsScreen() }
+            composable(Destination.Settings.route) {
+                SettingsScreen(
+                    onOpenAccounts = { navController.navigate(Destination.Accounts.route) }
+                )
+            }
+            composable(Destination.Accounts.route) {
+                AccountsScreen(onBack = { navController.popBackStack() })
+            }
             composable(
                 route = Destination.AddTransaction.route,
                 arguments = listOf(

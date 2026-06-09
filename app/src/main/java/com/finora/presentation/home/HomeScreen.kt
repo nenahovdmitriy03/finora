@@ -1,6 +1,7 @@
 package com.finora.presentation.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -74,7 +75,7 @@ fun HomeScreen(
                 }
             )
         }
-        item { AccountsStrip(state.accounts) }
+        item { AccountsStrip(state.accounts, onOpen = onSeeAccounts) }
 
         item {
             SectionHeader(
@@ -223,11 +224,11 @@ private fun FlowStat(
 }
 
 @Composable
-private fun AccountsStrip(accounts: List<AccountBalance>) {
+private fun AccountsStrip(accounts: List<AccountBalance>, onOpen: () -> Unit) {
     if (accounts.isEmpty()) {
-        FinoraCard {
+        FinoraCard(modifier = Modifier.clickable { onOpen() }) {
             Text(
-                text = "Добавьте счёт во вкладке «Счета», чтобы видеть баланс по каждому банку.",
+                text = "Добавьте счёт по кнопке «Все», чтобы видеть баланс по каждому банку.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -240,7 +241,9 @@ private fun AccountsStrip(accounts: List<AccountBalance>) {
             Surface(
                 shape = MaterialTheme.shapes.large,
                 color = MaterialTheme.colorScheme.surface,
-                modifier = Modifier.width(170.dp)
+                modifier = Modifier
+                    .width(170.dp)
+                    .clickable { onOpen() }
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     IconChip(iconKey = item.account.iconKey, color = Color(item.account.color))

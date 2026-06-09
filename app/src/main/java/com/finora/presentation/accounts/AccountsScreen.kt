@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,15 +16,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -34,10 +35,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -50,14 +49,15 @@ import com.finora.presentation.components.FinoraCard
 import com.finora.presentation.components.IconChip
 import com.finora.presentation.components.IconPickerRow
 import com.finora.presentation.components.SectionHeader
-import com.finora.presentation.theme.Violet
-import com.finora.presentation.theme.VioletDark
+import com.finora.presentation.util.MoneyTextField
 import com.finora.presentation.util.accountIconKeys
 import com.finora.presentation.util.finoraPalette
 import com.finora.presentation.util.formatMoney
+import com.finora.presentation.util.parseMoney
 
 @Composable
 fun AccountsScreen(
+    onBack: () -> Unit,
     viewModel: AccountsViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -66,35 +66,51 @@ fun AccountsScreen(
 
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 120.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 120.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            Text(
-                "Счета",
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onBackground
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Назад")
+                }
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    "Счета",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+            }
         }
         item {
-            Surface(shape = MaterialTheme.shapes.extraLarge, modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Brush.linearGradient(listOf(Violet, VioletDark)))
-                        .padding(22.dp)
-                ) {
-                    Text(
-                        "Всего на счетах",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.8f)
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        formatMoney(state.total),
-                        style = MaterialTheme.typography.displaySmall,
-                        color = Color.White
-                    )
+            FinoraCard {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Всего на счетах",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            formatMoney(state.total),
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            "${state.accounts.size} ${accountWord(state.accounts.size)}",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             }
         }
@@ -148,6 +164,17 @@ fun AccountsScreen(
             },
             onDelete = editorAccount?.let { acc -> { viewModel.delete(acc); showEditor = false } }
         )
+    }
+}
+
+private fun accountWord(count: Int): String {
+    val mod100 = count % 100
+    val mod10 = count % 10
+    return when {
+        mod100 in 11..14 -> "счетов"
+        mod10 == 1 -> "счёт"
+        mod10 in 2..4 -> "счёта"
+        else -> "счетов"
     }
 }
 
@@ -206,31 +233,29 @@ private fun AccountEditorDialog(
                     onValueChange = { name = it },
                     label = { Text("Название (напр. Тинькофф)") },
                     singleLine = true,
+                    shape = MaterialTheme.shapes.medium,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(10.dp))
-                OutlinedTextField(
+                MoneyTextField(
                     value = balance,
-                    onValueChange = { v -> balance = v.filter { it.isDigit() || it == '.' || it == ',' || it == '-' } },
-                    label = { Text("Текущий баланс, ₽") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
+                    onValueChange = { balance = it },
+                    label = "Текущий баланс",
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(14.dp))
                 Text("Тип", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(8.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    AccountType.entries.chunked(3).forEach { rowTypes ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            rowTypes.forEach { t ->
-                                TypePill(
-                                    label = t.title,
-                                    selected = type == t,
-                                    onClick = { type = t }
-                                )
-                            }
-                        }
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    AccountType.entries.forEach { t ->
+                        TypePill(
+                            label = t.title,
+                            selected = type == t,
+                            onClick = { type = t }
+                        )
                     }
                 }
                 Spacer(Modifier.height(14.dp))
@@ -245,10 +270,7 @@ private fun AccountEditorDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = {
-                    val value = balance.replace(',', '.').toDoubleOrNull() ?: 0.0
-                    onConfirm(name, type, value, icon, color)
-                },
+                onClick = { onConfirm(name, type, parseMoney(balance), icon, color) },
                 enabled = name.isNotBlank()
             ) { Text("Сохранить") }
         },

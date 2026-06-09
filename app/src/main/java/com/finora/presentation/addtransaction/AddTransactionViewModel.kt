@@ -11,6 +11,7 @@ import com.finora.domain.model.Account
 import com.finora.domain.model.Category
 import com.finora.domain.model.Transaction
 import com.finora.domain.model.TransactionType
+import com.finora.presentation.util.sanitizeMoneyInput
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -55,7 +56,7 @@ class AddTransactionViewModel(private val repository: FinanceRepository) : ViewM
     }
 
     fun setAmount(value: String) {
-        amountText = value.filter { it.isDigit() || it == '.' || it == ',' }
+        amountText = sanitizeMoneyInput(value)
     }
 
     fun setAccount(id: Long) { accountId = id }

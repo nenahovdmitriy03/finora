@@ -225,7 +225,7 @@ private fun OnboardingPageContent(page: OnboardingPage, pageIndex: Int) {
                 ) {
                     com.finora.presentation.guide.MascotGirl(
                         modifier = Modifier
-                            .size(180.dp)
+                            .size(width = 160.dp, height = 220.dp)
                             .graphicsLayer { translationY = floatOffset }
                     )
                 }

@@ -40,6 +40,12 @@ enum class AccountType(val title: String) {
     OTHER("Другое")
 }
 
+/** Capitalization payout frequency for interest-bearing accounts. */
+enum class InterestPeriod(val title: String, val periodsPerYear: Int) {
+    DAILY("Каждый день", 365),
+    MONTHLY("Раз в месяц", 12)
+}
+
 data class Account(
     val id: Long = 0,
     val name: String,
@@ -47,8 +53,16 @@ data class Account(
     val initialBalance: Double = 0.0,
     val color: Long = 0xFF6C5CE7,
     val iconKey: String = "wallet",
-    val createdAt: Long = System.currentTimeMillis()
-)
+    val createdAt: Long = System.currentTimeMillis(),
+    /** Annual interest rate in percent (0 = no capitalization). */
+    val interestRate: Double = 0.0,
+    /** How often interest is paid out, null = disabled. */
+    val interestPeriod: InterestPeriod? = null,
+    /** Timestamp of the last applied capitalization (null = never). */
+    val lastInterestAt: Long? = null
+) {
+    val hasInterest: Boolean get() = interestPeriod != null && interestRate > 0.0
+}
 
 data class Category(
     val id: Long = 0,

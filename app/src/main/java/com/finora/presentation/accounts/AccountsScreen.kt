@@ -26,8 +26,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,6 +47,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.finora.domain.model.Account
 import com.finora.domain.model.AccountBalance
 import com.finora.domain.model.AccountType
+import com.finora.domain.model.InterestPeriod
 import com.finora.presentation.AppViewModelProvider
 import com.finora.presentation.components.ColorPickerRow
 import com.finora.presentation.components.FinoraCard
@@ -152,14 +156,18 @@ fun AccountsScreen(
         AccountEditorDialog(
             initial = editorAccount,
             onDismiss = { showEditor = false },
-            onConfirm = { name, type, balance, icon, color ->
+            onConfirm = { name, type, balance, icon, color, rate, period ->
                 viewModel.saveAccount(
                     id = editorAccount?.id ?: 0L,
                     name = name,
                     type = type,
                     initialBalance = balance,
                     iconKey = icon,
-                    color = color
+                    color = color,
+                    interestRate = rate,
+                    interestPeriod = period,
+                    previousLastInterestAt = editorAccount?.lastInterestAt,
+                    previouslyHadInterest = editorAccount?.hasInterest == true
                 )
                 showEditor = false
             },
@@ -212,7 +220,15 @@ private fun AccountCard(item: AccountBalance, onClick: () -> Unit) {
 private fun AccountEditorDialog(
     initial: Account?,
     onDismiss: () -> Unit,
-    onConfirm: (name: String, type: AccountType, balance: Double, icon: String, color: Long) -> Unit,
+    onConfirm: (
+        name: String,
+        type: AccountType,
+        balance: Double,
+        icon: String,
+        color: Long,
+        interestRate: Double,
+        interestPeriod: InterestPeriod?
+    ) -> Unit,
     onDelete: (() -> Unit)?
 ) {
     var name by remember { mutableStateOf(initial?.name ?: "") }
@@ -224,6 +240,14 @@ private fun AccountEditorDialog(
     var icon by remember { mutableStateOf(initial?.iconKey ?: "card") }
     var color by remember { mutableStateOf(initial?.color ?: finoraPalette[0]) }
     var type by remember { mutableStateOf(initial?.type ?: AccountType.CARD) }
+    var interestOn by remember { mutableStateOf(initial?.hasInterest ?: false) }
+    var rateText by remember {
+        mutableStateOf(
+            initial?.interestRate?.takeIf { it > 0.0 }
+                ?.let { if (it % 1.0 == 0.0) it.toLong().toString() else it.toString() } ?: ""
+        )
+    }
+    var period by remember { mutableStateOf(initial?.interestPeriod ?: InterestPeriod.MONTHLY) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -268,11 +292,57 @@ private fun AccountEditorDialog(
                 Text("Цвет", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(8.dp))
                 ColorPickerRow(colors = finoraPalette, selected = color, onSelect = { color = it })
+                Spacer(Modifier.height(16.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Накопительный счёт",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            "Начислять проценты в «Капитализацию»",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(checked = interestOn, onCheckedChange = { interestOn = it })
+                }
+                if (interestOn) {
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = rateText,
+                        onValueChange = { input ->
+                            rateText = input.filter { it.isDigit() || it == '.' || it == ',' }
+                        },
+                        label = { Text("Годовая ставка") },
+                        suffix = { Text("% годовых") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Text("Выплата", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(8.dp))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        InterestPeriod.entries.forEach { p ->
+                            TypePill(label = p.title, selected = period == p, onClick = { period = p })
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
             TextButton(
-                onClick = { onConfirm(name, type, parseMoney(balance), icon, color) },
+                onClick = {
+                    val rate = if (interestOn) parseMoney(rateText) else 0.0
+                    val selectedPeriod = if (interestOn) period else null
+                    onConfirm(name, type, parseMoney(balance), icon, color, rate, selectedPeriod)
+                },
                 enabled = name.isNotBlank()
             ) { Text("Сохранить") }
         },

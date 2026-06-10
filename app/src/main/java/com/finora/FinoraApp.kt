@@ -19,6 +19,8 @@ class FinoraApp : Application() {
         container = AppContainer(this)
         appScope.launch {
             container.repository.ensureSeeded()
+            // Pay out any due interest on savings accounts.
+            container.repository.applyInterestAccruals()
         }
     }
 }

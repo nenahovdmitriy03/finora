@@ -6,6 +6,7 @@ import com.finora.data.repository.FinanceRepository
 import com.finora.domain.model.Account
 import com.finora.domain.model.AccountBalance
 import com.finora.domain.model.AccountType
+import com.finora.domain.model.InterestPeriod
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -29,9 +30,21 @@ class AccountsViewModel(private val repository: FinanceRepository) : ViewModel()
         type: AccountType,
         initialBalance: Double,
         iconKey: String,
-        color: Long
+        color: Long,
+        interestRate: Double = 0.0,
+        interestPeriod: InterestPeriod? = null,
+        previousLastInterestAt: Long? = null,
+        previouslyHadInterest: Boolean = false
     ) {
         if (name.isBlank()) return
+        val enabled = interestPeriod != null && interestRate > 0.0
+        // Start accruing from "now" when interest is newly enabled, otherwise
+        // keep the prior clock so we don't backfill or lose progress.
+        val lastInterestAt = when {
+            !enabled -> null
+            previouslyHadInterest -> previousLastInterestAt ?: System.currentTimeMillis()
+            else -> System.currentTimeMillis()
+        }
         viewModelScope.launch {
             repository.addAccount(
                 Account(
@@ -40,9 +53,13 @@ class AccountsViewModel(private val repository: FinanceRepository) : ViewModel()
                     type = type,
                     initialBalance = initialBalance,
                     color = color,
-                    iconKey = iconKey
+                    iconKey = iconKey,
+                    interestRate = if (enabled) interestRate else 0.0,
+                    interestPeriod = if (enabled) interestPeriod else null,
+                    lastInterestAt = lastInterestAt
                 )
             )
+            repository.applyInterestAccruals()
         }
     }
 

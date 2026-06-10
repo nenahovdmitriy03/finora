@@ -181,7 +181,7 @@ private fun GoalCard(
         }
         if (sourceAccount != null) {
             Spacer(Modifier.height(12.dp))
-            SourceAccountRow(sourceAccount)
+            SourceAccountRow(source = sourceAccount, takenAmount = goal.savedAmount)
         }
         Spacer(Modifier.height(12.dp))
         FilledTonalButton(onClick = onContribute, modifier = Modifier.fillMaxWidth()) {
@@ -192,9 +192,9 @@ private fun GoalCard(
     }
 }
 
-/** A subtle chip showing which account this goal's money comes from. */
+/** A subtle chip showing which account funds this goal and how much was taken from it. */
 @Composable
-private fun SourceAccountRow(source: AccountBalance) {
+private fun SourceAccountRow(source: AccountBalance, takenAmount: Double) {
     val accColor = Color(source.account.color)
     Row(
         modifier = Modifier
@@ -208,19 +208,19 @@ private fun SourceAccountRow(source: AccountBalance) {
         Spacer(Modifier.width(10.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                "Счёт цели",
+                "Счёт цели · ${source.account.name}",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                source.account.name,
+                "Взято со счёта",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onBackground
             )
         }
         Text(
-            formatMoney(source.balance),
-            style = MaterialTheme.typography.labelLarge,
+            formatMoney(takenAmount),
+            style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onBackground
         )

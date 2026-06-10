@@ -45,6 +45,7 @@ import com.finora.presentation.components.EmptyState
 import com.finora.presentation.components.FinoraCard
 import com.finora.presentation.components.NetBar
 import com.finora.presentation.components.NetTrendChart
+import com.finora.presentation.util.chartColorAt
 import com.finora.presentation.util.formatMoney
 import kotlin.math.roundToInt
 
@@ -171,7 +172,7 @@ fun StatisticsScreen(
                 } else {
                     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                         DonutChart(
-                            slices = stats.map { DonutSlice(it.total.toFloat(), Color(it.category.color)) },
+                            slices = stats.mapIndexed { i, s -> DonutSlice(s.total.toFloat(), Color(chartColorAt(i))) },
                             center = {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text(
@@ -189,8 +190,8 @@ fun StatisticsScreen(
                         )
                     }
                     Spacer(Modifier.height(20.dp))
-                    stats.forEach { stat ->
-                        CategoryStatRow(stat)
+                    stats.forEachIndexed { i, stat ->
+                        CategoryStatRow(stat, Color(chartColorAt(i)))
                         Spacer(Modifier.height(12.dp))
                     }
                 }
@@ -214,8 +215,7 @@ private fun SummaryTile(label: String, amount: Double, color: Color, modifier: M
 }
 
 @Composable
-private fun CategoryStatRow(stat: CategoryStat) {
-    val color = Color(stat.category.color)
+private fun CategoryStatRow(stat: CategoryStat, color: Color) {
     Column {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Box(

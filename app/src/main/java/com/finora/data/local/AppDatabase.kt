@@ -20,7 +20,7 @@ import com.finora.data.local.entity.TransactionEntity
         TransactionEntity::class,
         GoalEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -36,6 +36,15 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE goals ADD COLUMN linkedAccountId INTEGER")
+            }
+        }
+
+        /** v3: interest-bearing (savings) accounts with periodic capitalization. */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE accounts ADD COLUMN interestRate REAL NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE accounts ADD COLUMN interestPeriod TEXT")
+                db.execSQL("ALTER TABLE accounts ADD COLUMN lastInterestAt INTEGER")
             }
         }
     }

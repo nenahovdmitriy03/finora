@@ -12,7 +12,13 @@ data class AccountEntity(
     val initialBalance: Double,
     val color: Long,
     val iconKey: String,
-    val createdAt: Long
+    val createdAt: Long,
+    /** Annual interest rate in percent. 0 for normal accounts. */
+    val interestRate: Double = 0.0,
+    /** "DAILY"/"MONTHLY" or null if no capitalization. */
+    val interestPeriod: String? = null,
+    /** Last capitalization timestamp; null = never applied. */
+    val lastInterestAt: Long? = null
 )
 
 @Entity(tableName = "categories")

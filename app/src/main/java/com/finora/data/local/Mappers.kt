@@ -8,11 +8,15 @@ import com.finora.domain.model.Account
 import com.finora.domain.model.AccountType
 import com.finora.domain.model.Category
 import com.finora.domain.model.Goal
+import com.finora.domain.model.InterestPeriod
 import com.finora.domain.model.Transaction
 import com.finora.domain.model.TransactionType
 
 private fun parseAccountType(value: String): AccountType =
     AccountType.entries.firstOrNull { it.name == value } ?: AccountType.OTHER
+
+private fun parseInterestPeriod(value: String?): InterestPeriod? =
+    value?.let { v -> InterestPeriod.entries.firstOrNull { it.name == v } }
 
 private fun parseTransactionType(value: String): TransactionType =
     TransactionType.entries.firstOrNull { it.name == value } ?: TransactionType.EXPENSE
@@ -24,7 +28,10 @@ fun AccountEntity.toDomain() = Account(
     initialBalance = initialBalance,
     color = color,
     iconKey = iconKey,
-    createdAt = createdAt
+    createdAt = createdAt,
+    interestRate = interestRate,
+    interestPeriod = parseInterestPeriod(interestPeriod),
+    lastInterestAt = lastInterestAt
 )
 
 fun Account.toEntity() = AccountEntity(
@@ -34,7 +41,10 @@ fun Account.toEntity() = AccountEntity(
     initialBalance = initialBalance,
     color = color,
     iconKey = iconKey,
-    createdAt = createdAt
+    createdAt = createdAt,
+    interestRate = interestRate,
+    interestPeriod = interestPeriod?.name,
+    lastInterestAt = lastInterestAt
 )
 
 fun CategoryEntity.toDomain() = Category(

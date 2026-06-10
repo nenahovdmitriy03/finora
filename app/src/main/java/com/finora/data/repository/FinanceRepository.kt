@@ -8,6 +8,7 @@ import com.finora.domain.model.Account
 import com.finora.domain.model.AccountBalance
 import com.finora.domain.model.Category
 import com.finora.domain.model.Goal
+import com.finora.domain.model.InterestPeriod
 import com.finora.domain.model.Transaction
 import com.finora.domain.model.TransactionDetails
 import com.finora.domain.model.TransactionType
@@ -25,6 +26,11 @@ class FinanceRepository(private val db: AppDatabase) {
     private val categoryDao = db.categoryDao()
     private val transactionDao = db.transactionDao()
     private val goalDao = db.goalDao()
+
+    private companion object {
+        const val DAY_MS = 86_400_000L
+        const val MAX_PERIODS = 400 // safety cap against huge backfills
+    }
 
     // ---- Accounts ----
     fun observeAccounts(): Flow<List<Account>> =
@@ -115,6 +121,76 @@ class FinanceRepository(private val db: AppDatabase) {
         goalDao.upsert(goal.copy(savedAmount = newSaved, linkedAccountId = accountId).toEntity())
         accountDao.upsert(account.copy(initialBalance = account.initialBalance - realized).toEntity())
     }
+
+    // ---- Interest / capitalization ----
+    /**
+     * Accrues interest for every savings account whose payout period(s) elapsed
+     * since [lastInterestAt] (or createdAt). Interest is booked as INCOME
+     * transactions in the "Капитализация" category, so it shows up everywhere
+     * balances are derived from transactions. Idempotent — safe to call on launch.
+     */
+    suspend fun applyInterestAccruals(now: Long = System.currentTimeMillis()) {
+        val savings = accountDao.getAll().map { it.toDomain() }.filter { it.hasInterest }
+        if (savings.isEmpty()) return
+        var capCategoryId: Long? = null
+        for (acc in savings) {
+            val period = acc.interestPeriod ?: continue
+            val periodMs = when (period) {
+                InterestPeriod.DAILY -> DAY_MS
+                InterestPeriod.MONTHLY -> 30L * DAY_MS
+            }
+            val base = acc.lastInterestAt ?: acc.createdAt
+            if (now <= base) continue
+            val periods = ((now - base) / periodMs).toInt().coerceIn(0, MAX_PERIODS)
+            if (periods <= 0) continue
+            val ratePerPeriod = acc.interestRate / 100.0 / period.periodsPerYear
+            val advanceTo = base + periods.toLong() * periodMs
+            if (ratePerPeriod <= 0.0) {
+                accountDao.update(acc.copy(lastInterestAt = advanceTo).toEntity())
+                continue
+            }
+            var balance = acc.initialBalance + transactionDao.balanceDelta(acc.id)
+            var interestTotal = 0.0
+            repeat(periods) {
+                val gain = balance * ratePerPeriod
+                interestTotal += gain
+                balance += gain
+            }
+            val rounded = round2(interestTotal)
+            if (rounded > 0.0) {
+                if (capCategoryId == null) capCategoryId = ensureCapitalizationCategory()
+                transactionDao.upsert(
+                    Transaction(
+                        amount = rounded,
+                        type = TransactionType.INCOME,
+                        accountId = acc.id,
+                        categoryId = capCategoryId,
+                        note = "Проценты по счёту «${acc.name}»",
+                        date = now
+                    ).toEntity()
+                )
+            }
+            accountDao.update(acc.copy(lastInterestAt = advanceTo).toEntity())
+        }
+    }
+
+    private suspend fun ensureCapitalizationCategory(): Long {
+        categoryDao.findByNameAndType(
+            DefaultData.CAPITALIZATION_CATEGORY,
+            TransactionType.INCOME.name
+        )?.let { return it.id }
+        return categoryDao.upsert(
+            Category(
+                name = DefaultData.CAPITALIZATION_CATEGORY,
+                type = TransactionType.INCOME,
+                iconKey = "percent",
+                color = 0xFF55EFC4,
+                isDefault = true
+            ).toEntity()
+        )
+    }
+
+    private fun round2(value: Double): Double = kotlin.math.round(value * 100.0) / 100.0
 
     // ---- Seeding ----
     suspend fun ensureSeeded() {

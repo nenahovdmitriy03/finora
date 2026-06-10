@@ -20,6 +20,9 @@ interface AccountDao {
     @Query("SELECT * FROM accounts WHERE id = :id")
     suspend fun getById(id: Long): AccountEntity?
 
+    @Query("SELECT * FROM accounts")
+    suspend fun getAll(): List<AccountEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(account: AccountEntity): Long
 
@@ -43,6 +46,9 @@ interface CategoryDao {
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(categories: List<CategoryEntity>)
+
+    @Query("SELECT * FROM categories WHERE name = :name AND type = :type LIMIT 1")
+    suspend fun findByNameAndType(name: String, type: String): CategoryEntity?
 
     @Delete
     suspend fun delete(category: CategoryEntity)
@@ -70,6 +76,12 @@ interface TransactionDao {
 
     @Query("DELETE FROM transactions WHERE accountId = :accountId")
     suspend fun deleteByAccount(accountId: Long)
+
+    @Query(
+        "SELECT COALESCE(SUM(CASE WHEN type = 'INCOME' THEN amount ELSE -amount END), 0) " +
+            "FROM transactions WHERE accountId = :accountId"
+    )
+    suspend fun balanceDelta(accountId: Long): Double
 }
 
 @Dao

@@ -6,6 +6,9 @@ import com.finora.domain.model.TransactionType
 /** Default categories seeded on first launch. */
 object DefaultData {
 
+    /** Income category that interest payouts are booked to. */
+    const val CAPITALIZATION_CATEGORY = "Капитализация"
+
     fun categories(): List<CategoryEntity> = listOf(
         // Expenses
         cat("Продукты", "cart", 0xFF3FB18C),
@@ -30,6 +33,7 @@ object DefaultData {
         cat("Подарок", "gift", 0xFFE84393, TransactionType.INCOME),
         cat("Инвестиции", "invest", 0xFFFDCB6E, TransactionType.INCOME),
         cat("Кэшбэк", "savings", 0xFF00CEC9, TransactionType.INCOME),
+        cat(CAPITALIZATION_CATEGORY, "percent", 0xFF55EFC4, TransactionType.INCOME),
         cat("Прочее", "category", 0xFFB2BEC3, TransactionType.INCOME)
     )
 

@@ -2,15 +2,19 @@ package com.finora.data.local
 
 import com.finora.data.local.entity.AccountEntity
 import com.finora.data.local.entity.CategoryEntity
+import com.finora.data.local.entity.GoalContributionEntity
 import com.finora.data.local.entity.GoalEntity
 import com.finora.data.local.entity.TransactionEntity
+import com.finora.data.local.entity.TransferEntity
 import com.finora.domain.model.Account
 import com.finora.domain.model.AccountType
 import com.finora.domain.model.Category
 import com.finora.domain.model.Goal
+import com.finora.domain.model.GoalContribution
 import com.finora.domain.model.InterestPeriod
 import com.finora.domain.model.Transaction
 import com.finora.domain.model.TransactionType
+import com.finora.domain.model.Transfer
 
 private fun parseAccountType(value: String): AccountType =
     AccountType.entries.firstOrNull { it.name == value } ?: AccountType.OTHER
@@ -20,6 +24,8 @@ private fun parseInterestPeriod(value: String?): InterestPeriod? =
 
 private fun parseTransactionType(value: String): TransactionType =
     TransactionType.entries.firstOrNull { it.name == value } ?: TransactionType.EXPENSE
+
+// ─── Account ─────────────────────────────────────────────────────────────────
 
 fun AccountEntity.toDomain() = Account(
     id = id,
@@ -32,7 +38,8 @@ fun AccountEntity.toDomain() = Account(
     interestRate = interestRate,
     interestPeriod = parseInterestPeriod(interestPeriod),
     lastInterestAt = lastInterestAt,
-    interestPayoutMinute = interestPayoutMinute
+    interestPayoutMinute = interestPayoutMinute,
+    interestPayoutDay = interestPayoutDay
 )
 
 fun Account.toEntity() = AccountEntity(
@@ -46,8 +53,11 @@ fun Account.toEntity() = AccountEntity(
     interestRate = interestRate,
     interestPeriod = interestPeriod?.name,
     lastInterestAt = lastInterestAt,
-    interestPayoutMinute = interestPayoutMinute
+    interestPayoutMinute = interestPayoutMinute,
+    interestPayoutDay = interestPayoutDay
 )
+
+// ─── Category ────────────────────────────────────────────────────────────────
 
 fun CategoryEntity.toDomain() = Category(
     id = id,
@@ -66,6 +76,8 @@ fun Category.toEntity() = CategoryEntity(
     color = color,
     isDefault = isDefault
 )
+
+// ─── Transaction ─────────────────────────────────────────────────────────────
 
 fun TransactionEntity.toDomain() = Transaction(
     id = id,
@@ -89,6 +101,8 @@ fun Transaction.toEntity() = TransactionEntity(
     createdAt = createdAt
 )
 
+// ─── Goal ────────────────────────────────────────────────────────────────────
+
 fun GoalEntity.toDomain() = Goal(
     id = id,
     name = name,
@@ -111,4 +125,44 @@ fun Goal.toEntity() = GoalEntity(
     deadline = deadline,
     createdAt = createdAt,
     linkedAccountId = linkedAccountId
+)
+
+// ─── Goal Contribution ──────────────────────────────────────────────────────
+
+fun GoalContributionEntity.toDomain() = GoalContribution(
+    id = id,
+    goalId = goalId,
+    accountId = accountId,
+    amount = amount,
+    date = date
+)
+
+fun GoalContribution.toEntity() = GoalContributionEntity(
+    id = id,
+    goalId = goalId,
+    accountId = accountId,
+    amount = amount,
+    date = date
+)
+
+// ─── Transfer ────────────────────────────────────────────────────────────────
+
+fun TransferEntity.toDomain() = Transfer(
+    id = id,
+    fromAccountId = fromAccountId,
+    toAccountId = toAccountId,
+    amount = amount,
+    note = note,
+    date = date,
+    createdAt = createdAt
+)
+
+fun Transfer.toEntity() = TransferEntity(
+    id = id,
+    fromAccountId = fromAccountId,
+    toAccountId = toAccountId,
+    amount = amount,
+    note = note,
+    date = date,
+    createdAt = createdAt
 )

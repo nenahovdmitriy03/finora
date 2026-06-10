@@ -81,6 +81,7 @@ fun AddTransactionScreen(
     var showDatePicker by remember { mutableStateOf(false) }
     var showCategoryPicker by remember { mutableStateOf(false) }
 
+    val isTransfer = viewModel.mode == EntryMode.TRANSFER
     val visibleCategories = categories.filter { it.type == viewModel.type }
     val selectedCategory = visibleCategories.firstOrNull { it.id == viewModel.categoryId }
     val accentColor = MaterialTheme.colorScheme.primary
@@ -90,7 +91,15 @@ fun AddTransactionScreen(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text(if (isEditing) "Редактировать" else "Новая операция") },
+                title = {
+                    Text(
+                        when {
+                            isEditing -> "Редактировать"
+                            isTransfer -> "Перевод"
+                            else -> "Новая операция"
+                        }
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onDone) {
                         Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Назад")
@@ -120,10 +129,10 @@ fun AddTransactionScreen(
                 .padding(horizontal = 16.dp)
                 .padding(bottom = 32.dp)
         ) {
-            // Type toggle
-            TypeToggle(
-                type = viewModel.type,
-                onChange = viewModel::updateType
+            // Type toggle — now 3-way: Расход / Доход / Перевод
+            ModeToggle(
+                mode = viewModel.mode,
+                onChange = viewModel::updateMode
             )
             Spacer(Modifier.height(20.dp))
 
@@ -135,74 +144,134 @@ fun AddTransactionScreen(
             )
             Spacer(Modifier.height(24.dp))
 
-            // Category — opens a dedicated full-screen picker
-            Text(
-                "Категория",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(10.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(MaterialTheme.shapes.medium)
-                    .background(MaterialTheme.colorScheme.surface)
-                    .clickable { showCategoryPicker = true }
-                    .padding(14.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (selectedCategory != null) {
-                    IconChip(iconKey = selectedCategory.iconKey, color = Color(selectedCategory.color), size = 38.dp)
-                    Spacer(Modifier.width(12.dp))
+            if (isTransfer) {
+                // ─── Transfer mode: from / to account pickers ────────────
+                Text(
+                    "Со счёта",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(10.dp))
+                if (accounts.isEmpty()) {
                     Text(
-                        selectedCategory.name,
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onBackground
+                        "Сначала создайте счёт: Настройки → Мои счета.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error
                     )
                 } else {
-                    Text(
-                        "Выберите категорию",
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Text(
-                    "Изменить",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-            Spacer(Modifier.height(24.dp))
-
-            // Account
-            Text(
-                "Счёт",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(10.dp))
-            if (accounts.isEmpty()) {
-                Text(
-                    "Сначала создайте счёт: Настройки → Мои счета.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error
-                )
-            } else {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    accounts.forEach { account ->
-                        CategoryChip(
-                            name = account.name,
-                            iconKey = account.iconKey,
-                            color = Color(account.color),
-                            selected = viewModel.accountId == account.id,
-                            onClick = { viewModel.setAccount(account.id) }
-                        )
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        accounts.forEach { account ->
+                            CategoryChip(
+                                name = account.name,
+                                iconKey = account.iconKey,
+                                color = Color(account.color),
+                                selected = viewModel.accountId == account.id,
+                                onClick = { viewModel.setAccount(account.id) }
+                            )
+                        }
                     }
                 }
+                Spacer(Modifier.height(24.dp))
+
+                Text(
+                    "На счёт",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(10.dp))
+                if (accounts.size < 2) {
+                    Text(
+                        "Для перевода нужно минимум 2 счёта.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                } else {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        accounts.filter { it.id != viewModel.accountId }.forEach { account ->
+                            CategoryChip(
+                                name = account.name,
+                                iconKey = account.iconKey,
+                                color = Color(account.color),
+                                selected = viewModel.toAccountId == account.id,
+                                onClick = { viewModel.setToAccount(account.id) }
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(24.dp))
+
+            } else {
+                // ─── Income/Expense mode: category + single account ──────
+
+                // Category — opens a dedicated full-screen picker
+                Text(
+                    "Категория",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(MaterialTheme.shapes.medium)
+                        .background(MaterialTheme.colorScheme.surface)
+                        .clickable { showCategoryPicker = true }
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (selectedCategory != null) {
+                        IconChip(iconKey = selectedCategory.iconKey, color = Color(selectedCategory.color), size = 38.dp)
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            selectedCategory.name,
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                    } else {
+                        Text(
+                            "Выберите категорию",
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Text(
+                        "Изменить",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Spacer(Modifier.height(24.dp))
+
+                // Account
+                Text(
+                    "Счёт",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(10.dp))
+                if (accounts.isEmpty()) {
+                    Text(
+                        "Сначала создайте счёт: Настройки → Мои счета.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                } else {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        accounts.forEach { account ->
+                            CategoryChip(
+                                name = account.name,
+                                iconKey = account.iconKey,
+                                color = Color(account.color),
+                                selected = viewModel.accountId == account.id,
+                                onClick = { viewModel.setAccount(account.id) }
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(24.dp))
             }
-            Spacer(Modifier.height(24.dp))
 
             // Date
             Row(
@@ -251,7 +320,14 @@ fun AddTransactionScreen(
             ) {
                 Icon(Icons.Rounded.Check, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text(if (isEditing) "Сохранить" else "Добавить", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    when {
+                        isEditing -> "Сохранить"
+                        isTransfer -> "Перевести"
+                        else -> "Добавить"
+                    },
+                    style = MaterialTheme.typography.titleMedium
+                )
             }
         }
     }
@@ -274,7 +350,7 @@ fun AddTransactionScreen(
         }
     }
 
-    if (showCategoryPicker) {
+    if (showCategoryPicker && !isTransfer) {
         CategoryPickerDialog(
             categories = visibleCategories,
             selectedId = viewModel.categoryId,
@@ -287,12 +363,13 @@ fun AddTransactionScreen(
     }
 }
 
+// ─── 3-way Mode Toggle ──────────────────────────────────────────────────────
+
 @Composable
-private fun TypeToggle(
-    type: TransactionType,
-    onChange: (TransactionType) -> Unit
+private fun ModeToggle(
+    mode: EntryMode,
+    onChange: (EntryMode) -> Unit
 ) {
-    // Neutral toggle: the selected side uses the app accent (no green/red).
     val accent = MaterialTheme.colorScheme.primary
     Row(
         modifier = Modifier
@@ -301,23 +378,29 @@ private fun TypeToggle(
             .background(MaterialTheme.colorScheme.surface)
             .padding(4.dp)
     ) {
-        ToggleHalf(
+        ToggleSegment(
             label = "Расход",
-            selected = type == TransactionType.EXPENSE,
+            selected = mode == EntryMode.EXPENSE,
             selectedColor = accent,
             modifier = Modifier.weight(1f)
-        ) { onChange(TransactionType.EXPENSE) }
-        ToggleHalf(
+        ) { onChange(EntryMode.EXPENSE) }
+        ToggleSegment(
             label = "Доход",
-            selected = type == TransactionType.INCOME,
+            selected = mode == EntryMode.INCOME,
             selectedColor = accent,
             modifier = Modifier.weight(1f)
-        ) { onChange(TransactionType.INCOME) }
+        ) { onChange(EntryMode.INCOME) }
+        ToggleSegment(
+            label = "Перевод",
+            selected = mode == EntryMode.TRANSFER,
+            selectedColor = accent,
+            modifier = Modifier.weight(1f)
+        ) { onChange(EntryMode.TRANSFER) }
     }
 }
 
 @Composable
-private fun ToggleHalf(
+private fun ToggleSegment(
     label: String,
     selected: Boolean,
     selectedColor: Color,
@@ -340,6 +423,8 @@ private fun ToggleHalf(
         )
     }
 }
+
+// ─── Shared composables ──────────────────────────────────────────────────────
 
 @Composable
 private fun AmountField(value: String, onValueChange: (String) -> Unit, accent: Color) {

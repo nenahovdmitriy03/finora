@@ -20,7 +20,9 @@ data class AccountEntity(
     /** Last capitalization timestamp; null = never applied. */
     val lastInterestAt: Long? = null,
     /** Payout time of day in minutes from midnight (0..1439). */
-    val interestPayoutMinute: Int = 9 * 60
+    val interestPayoutMinute: Int = 9 * 60,
+    /** Day of month for monthly interest payout (1..31). Clamped to actual month length. */
+    val interestPayoutDay: Int = 1
 )
 
 @Entity(tableName = "categories")
@@ -58,6 +60,35 @@ data class GoalEntity(
     val color: Long,
     val deadline: Long?,
     val createdAt: Long,
-    /** Account the goal is funded from (last used in a contribution). Nullable for legacy rows. */
+    /** @deprecated Kept for backward compat. Use goal_contributions table instead. */
     val linkedAccountId: Long? = null
+)
+
+/** Tracks every deposit/withdrawal to a goal from a specific account. */
+@Entity(
+    tableName = "goal_contributions",
+    indices = [Index("goalId"), Index("accountId")]
+)
+data class GoalContributionEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val goalId: Long,
+    val accountId: Long,
+    /** Positive = deposit into goal, negative = withdrawal. */
+    val amount: Double,
+    val date: Long
+)
+
+/** Money moved between two accounts (not income/expense). */
+@Entity(
+    tableName = "transfers",
+    indices = [Index("fromAccountId"), Index("toAccountId"), Index("date")]
+)
+data class TransferEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val fromAccountId: Long,
+    val toAccountId: Long,
+    val amount: Double,
+    val note: String = "",
+    val date: Long,
+    val createdAt: Long
 )

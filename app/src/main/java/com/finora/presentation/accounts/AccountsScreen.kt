@@ -27,6 +27,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -170,7 +171,7 @@ fun AccountsScreen(
         AccountEditorScreen(
             initial = editorAccount,
             onDismiss = { showEditor = false },
-            onConfirm = { name, type, balance, icon, color, rate, period, payoutMinute ->
+            onConfirm = { name, type, balance, icon, color, rate, period, payoutMinute, payoutDay ->
                 viewModel.saveAccount(
                     id = editorAccount?.id ?: 0L,
                     name = name,
@@ -181,6 +182,7 @@ fun AccountsScreen(
                     interestRate = rate,
                     interestPeriod = period,
                     interestPayoutMinute = payoutMinute,
+                    interestPayoutDay = payoutDay,
                     previousLastInterestAt = editorAccount?.lastInterestAt,
                     previouslyHadInterest = editorAccount?.hasInterest == true
                 )
@@ -243,7 +245,8 @@ private fun AccountEditorScreen(
         color: Long,
         interestRate: Double,
         interestPeriod: InterestPeriod?,
-        interestPayoutMinute: Int
+        interestPayoutMinute: Int,
+        interestPayoutDay: Int
     ) -> Unit,
     onDelete: (() -> Unit)?
 ) {
@@ -265,7 +268,9 @@ private fun AccountEditorScreen(
     }
     var period by remember { mutableStateOf(initial?.interestPeriod ?: InterestPeriod.MONTHLY) }
     var payoutMinute by remember { mutableIntStateOf(initial?.interestPayoutMinute ?: 9 * 60) }
+    var payoutDay by remember { mutableIntStateOf(initial?.interestPayoutDay ?: 1) }
     var showTimePicker by remember { mutableStateOf(false) }
+    var showDayPicker by remember { mutableStateOf(false) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -295,7 +300,7 @@ private fun AccountEditorScreen(
                         onClick = {
                             val rate = if (interestOn) parseMoney(rateText) else 0.0
                             val selectedPeriod = if (interestOn) period else null
-                            onConfirm(name, type, parseMoney(balance), icon, color, rate, selectedPeriod, payoutMinute)
+                            onConfirm(name, type, parseMoney(balance), icon, color, rate, selectedPeriod, payoutMinute, payoutDay)
                         },
                         enabled = name.isNotBlank()
                     ) { Text("Сохранить", style = MaterialTheme.typography.titleMedium) }
@@ -385,6 +390,43 @@ private fun AccountEditorScreen(
                                 TypePill(label = p.title, selected = period == p, onClick = { period = p })
                             }
                         }
+
+                        // ─── Day of month picker (only for MONTHLY) ─────────
+                        if (period == InterestPeriod.MONTHLY) {
+                            Spacer(Modifier.height(14.dp))
+                            Text("Дата выплаты", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(MaterialTheme.shapes.medium)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                                    .clickable { showDayPicker = true }
+                                    .padding(horizontal = 14.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Rounded.CalendarMonth,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(Modifier.width(10.dp))
+                                Text(
+                                    "Проценты начисляются",
+                                    modifier = Modifier.weight(1f),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                                Text(
+                                    "$payoutDay-го числа",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+
                         Spacer(Modifier.height(14.dp))
                         Text("Время выплаты", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(8.dp))
@@ -434,6 +476,7 @@ private fun AccountEditorScreen(
         }
     }
 
+    // ─── Time picker dialog ──────────────────────────────────────────────────
     if (showTimePicker) {
         val timeState = rememberTimePickerState(
             initialHour = payoutMinute / 60,
@@ -459,6 +502,62 @@ private fun AccountEditorScreen(
             }
         )
     }
+
+    // ─── Day of month picker dialog ──────────────────────────────────────────
+    if (showDayPicker) {
+        DayOfMonthPickerDialog(
+            selected = payoutDay,
+            onConfirm = { payoutDay = it; showDayPicker = false },
+            onDismiss = { showDayPicker = false }
+        )
+    }
+}
+
+/** Grid dialog to pick a day of month (1..31). */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DayOfMonthPickerDialog(
+    selected: Int,
+    onConfirm: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Число месяца") },
+        text = {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                for (day in 1..31) {
+                    val isSelected = day == selected
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(
+                                if (isSelected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.surfaceVariant
+                            )
+                            .clickable { onConfirm(day) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = day.toString(),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isSelected) Color.White
+                            else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Отмена") }
+        }
+    )
 }
 
 private fun formatMinuteOfDay(minute: Int): String {

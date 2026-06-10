@@ -61,7 +61,9 @@ data class Account(
     /** Timestamp of the last applied capitalization (null = never). */
     val lastInterestAt: Long? = null,
     /** Time of day (minutes from midnight, 0..1439) when interest is paid out. */
-    val interestPayoutMinute: Int = 9 * 60
+    val interestPayoutMinute: Int = 9 * 60,
+    /** Day of month (1..31) for monthly interest payout. Clamped at runtime. */
+    val interestPayoutDay: Int = 1
 ) {
     val hasInterest: Boolean get() = interestPeriod != null && interestRate > 0.0
 }
@@ -95,12 +97,32 @@ data class Goal(
     val color: Long = 0xFF3FB18C,
     val deadline: Long? = null,
     val createdAt: Long = System.currentTimeMillis(),
-    /** Account the goal's money is currently tied to (last contribution source). */
+    /** @deprecated Kept for Room compat; use GoalContribution instead. */
     val linkedAccountId: Long? = null
 ) {
     val progress: Float
         get() = if (targetAmount <= 0) 0f else (savedAmount / targetAmount).toFloat().coerceIn(0f, 1f)
 }
+
+/** One deposit/withdrawal for a goal from a specific account. */
+data class GoalContribution(
+    val id: Long = 0,
+    val goalId: Long,
+    val accountId: Long,
+    val amount: Double,
+    val date: Long = System.currentTimeMillis()
+)
+
+/** Money transfer between two accounts (doesn't affect income/expense stats). */
+data class Transfer(
+    val id: Long = 0,
+    val fromAccountId: Long,
+    val toAccountId: Long,
+    val amount: Double,
+    val note: String = "",
+    val date: Long = System.currentTimeMillis(),
+    val createdAt: Long = System.currentTimeMillis()
+)
 
 /** A transaction joined with its category + account for display. */
 data class TransactionDetails(
@@ -127,4 +149,10 @@ data class PeriodPoint(
 data class AccountBalance(
     val account: Account,
     val balance: Double
+)
+
+/** How much a single account contributed (net) to a goal. */
+data class GoalAccountSummary(
+    val account: Account,
+    val netAmount: Double
 )

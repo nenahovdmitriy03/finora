@@ -34,6 +34,7 @@ class AccountsViewModel(private val repository: FinanceRepository) : ViewModel()
         interestRate: Double = 0.0,
         interestPeriod: InterestPeriod? = null,
         interestPayoutMinute: Int = 9 * 60,
+        interestPayoutDay: Int = 1,
         previousLastInterestAt: Long? = null,
         previouslyHadInterest: Boolean = false
     ) {
@@ -59,7 +60,8 @@ class AccountsViewModel(private val repository: FinanceRepository) : ViewModel()
                     interestRate = if (enabled) interestRate else 0.0,
                     interestPeriod = if (enabled) interestPeriod else null,
                     lastInterestAt = lastInterestAt,
-                    interestPayoutMinute = interestPayoutMinute
+                    interestPayoutMinute = interestPayoutMinute,
+                    interestPayoutDay = interestPayoutDay
                 )
             )
             repository.applyInterestAccruals()

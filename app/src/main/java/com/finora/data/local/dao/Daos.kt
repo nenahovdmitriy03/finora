@@ -8,9 +8,16 @@ import androidx.room.Query
 import androidx.room.Update
 import com.finora.data.local.entity.AccountEntity
 import com.finora.data.local.entity.CategoryEntity
+import com.finora.data.local.entity.GoalContributionEntity
 import com.finora.data.local.entity.GoalEntity
 import com.finora.data.local.entity.TransactionEntity
+import com.finora.data.local.entity.TransferEntity
 import kotlinx.coroutines.flow.Flow
+
+/** Lightweight POJO for aggregated balance deltas per account. */
+data class BalanceDelta(val accountId: Long, val delta: Double)
+
+// ─── Accounts ────────────────────────────────────────────────────────────────
 
 @Dao
 interface AccountDao {
@@ -36,6 +43,8 @@ interface AccountDao {
     suspend fun count(): Int
 }
 
+// ─── Categories ──────────────────────────────────────────────────────────────
+
 @Dao
 interface CategoryDao {
     @Query("SELECT * FROM categories ORDER BY isDefault DESC, name ASC")
@@ -56,6 +65,8 @@ interface CategoryDao {
     @Query("SELECT COUNT(*) FROM categories")
     suspend fun count(): Int
 }
+
+// ─── Transactions ────────────────────────────────────────────────────────────
 
 @Dao
 interface TransactionDao {
@@ -82,7 +93,20 @@ interface TransactionDao {
             "FROM transactions WHERE accountId = :accountId"
     )
     suspend fun balanceDelta(accountId: Long): Double
+
+    /**
+     * Aggregated income−expense delta per account, computed in SQL.
+     * Much faster than loading every row into memory.
+     */
+    @Query(
+        "SELECT accountId, " +
+            "COALESCE(SUM(CASE WHEN type = 'INCOME' THEN amount ELSE -amount END), 0) AS delta " +
+            "FROM transactions GROUP BY accountId"
+    )
+    fun observeBalanceDeltas(): Flow<List<BalanceDelta>>
 }
+
+// ─── Goals ───────────────────────────────────────────────────────────────────
 
 @Dao
 interface GoalDao {
@@ -97,4 +121,56 @@ interface GoalDao {
 
     @Delete
     suspend fun delete(goal: GoalEntity)
+}
+
+// ─── Goal Contributions ──────────────────────────────────────────────────────
+
+@Dao
+interface GoalContributionDao {
+    /** All contributions across all goals, newest first. */
+    @Query("SELECT * FROM goal_contributions ORDER BY date DESC")
+    fun observeAll(): Flow<List<GoalContributionEntity>>
+
+    /** Contributions for one goal, newest first. */
+    @Query("SELECT * FROM goal_contributions WHERE goalId = :goalId ORDER BY date DESC")
+    fun observeByGoal(goalId: Long): Flow<List<GoalContributionEntity>>
+
+    @Insert
+    suspend fun insert(contribution: GoalContributionEntity): Long
+
+    @Query("DELETE FROM goal_contributions WHERE goalId = :goalId")
+    suspend fun deleteByGoal(goalId: Long)
+
+    @Query("DELETE FROM goal_contributions WHERE accountId = :accountId")
+    suspend fun deleteByAccount(accountId: Long)
+}
+
+// ─── Transfers ───────────────────────────────────────────────────────────────
+
+@Dao
+interface TransferDao {
+    @Query("SELECT * FROM transfers ORDER BY date DESC, id DESC")
+    fun observeAll(): Flow<List<TransferEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(transfer: TransferEntity): Long
+
+    @Delete
+    suspend fun delete(transfer: TransferEntity)
+
+    @Query("DELETE FROM transfers WHERE fromAccountId = :accountId OR toAccountId = :accountId")
+    suspend fun deleteByAccount(accountId: Long)
+
+    /**
+     * Net transfer effect per account (outgoing = negative, incoming = positive),
+     * computed entirely in SQL for efficiency.
+     */
+    @Query(
+        "SELECT fromAccountId AS accountId, -COALESCE(SUM(amount), 0) AS delta " +
+            "FROM transfers GROUP BY fromAccountId " +
+            "UNION ALL " +
+            "SELECT toAccountId AS accountId, COALESCE(SUM(amount), 0) AS delta " +
+            "FROM transfers GROUP BY toAccountId"
+    )
+    fun observeTransferDeltas(): Flow<List<BalanceDelta>>
 }

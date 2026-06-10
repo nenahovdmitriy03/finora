@@ -8,13 +8,16 @@ import com.finora.domain.model.Account
 import com.finora.domain.model.AccountBalance
 import com.finora.domain.model.Category
 import com.finora.domain.model.Goal
+import com.finora.domain.model.GoalContribution
 import com.finora.domain.model.InterestPeriod
 import com.finora.domain.model.Transaction
 import com.finora.domain.model.TransactionDetails
 import com.finora.domain.model.TransactionType
+import com.finora.domain.model.Transfer
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import java.util.Calendar
 
 /**
  * Single source of truth for all finance data. Reads return [Flow]s of domain
@@ -26,23 +29,36 @@ class FinanceRepository(private val db: AppDatabase) {
     private val categoryDao = db.categoryDao()
     private val transactionDao = db.transactionDao()
     private val goalDao = db.goalDao()
+    private val goalContributionDao = db.goalContributionDao()
+    private val transferDao = db.transferDao()
 
     private companion object {
         const val DAY_MS = 86_400_000L
         const val MAX_PERIODS = 400 // safety cap against huge backfills
     }
 
-    // ---- Accounts ----
+    // ─── Accounts ────────────────────────────────────────────────────────────
+
     fun observeAccounts(): Flow<List<Account>> =
         accountDao.observeAll().map { list -> list.map { it.toDomain() } }
 
+    /**
+     * Efficient account balances: SQL-aggregated transaction deltas + transfer
+     * deltas, combined with initial balances.
+     * Previous implementation loaded every transaction row into memory.
+     */
     fun observeAccountBalances(): Flow<List<AccountBalance>> =
-        combine(accountDao.observeAll(), transactionDao.observeAll()) { accounts, txs ->
+        combine(
+            accountDao.observeAll(),
+            transactionDao.observeBalanceDeltas(),
+            transferDao.observeTransferDeltas()
+        ) { accounts, txDeltas, transferDeltas ->
+            // Merge all deltas into a single map keyed by accountId
+            val deltaMap = mutableMapOf<Long, Double>()
+            for (d in txDeltas) deltaMap[d.accountId] = (deltaMap[d.accountId] ?: 0.0) + d.delta
+            for (d in transferDeltas) deltaMap[d.accountId] = (deltaMap[d.accountId] ?: 0.0) + d.delta
             accounts.map { acc ->
-                val delta = txs.filter { it.accountId == acc.id }.sumOf {
-                    if (it.type == TransactionType.INCOME.name) it.amount else -it.amount
-                }
-                AccountBalance(acc.toDomain(), acc.initialBalance + delta)
+                AccountBalance(acc.toDomain(), acc.initialBalance + (deltaMap[acc.id] ?: 0.0))
             }
         }
 
@@ -53,10 +69,13 @@ class FinanceRepository(private val db: AppDatabase) {
     suspend fun updateAccount(account: Account) = accountDao.update(account.toEntity())
     suspend fun deleteAccount(account: Account) {
         transactionDao.deleteByAccount(account.id)
+        transferDao.deleteByAccount(account.id)
+        goalContributionDao.deleteByAccount(account.id)
         accountDao.delete(account.toEntity())
     }
 
-    // ---- Categories ----
+    // ─── Categories ──────────────────────────────────────────────────────────
+
     fun observeCategories(): Flow<List<Category>> =
         categoryDao.observeAll().map { list -> list.map { it.toDomain() } }
 
@@ -66,7 +85,8 @@ class FinanceRepository(private val db: AppDatabase) {
     suspend fun addCategory(category: Category): Long = categoryDao.upsert(category.toEntity())
     suspend fun deleteCategory(category: Category) = categoryDao.delete(category.toEntity())
 
-    // ---- Transactions ----
+    // ─── Transactions ────────────────────────────────────────────────────────
+
     fun observeTransactionDetails(): Flow<List<TransactionDetails>> =
         combine(
             transactionDao.observeAll(),
@@ -96,82 +116,180 @@ class FinanceRepository(private val db: AppDatabase) {
     suspend fun getTransaction(id: Long): Transaction? =
         transactionDao.getById(id)?.toDomain()
 
-    // ---- Goals ----
+    // ─── Transfers ───────────────────────────────────────────────────────────
+
+    fun observeTransfers(): Flow<List<Transfer>> =
+        transferDao.observeAll().map { list -> list.map { it.toDomain() } }
+
+    suspend fun addTransfer(transfer: Transfer): Long =
+        transferDao.upsert(transfer.toEntity())
+
+    suspend fun deleteTransfer(transfer: Transfer) =
+        transferDao.delete(transfer.toEntity())
+
+    // ─── Goals ───────────────────────────────────────────────────────────────
+
     fun observeGoals(): Flow<List<Goal>> =
         goalDao.observeAll().map { list -> list.map { it.toDomain() } }
 
+    /** All contributions for all goals (for aggregation in the UI layer). */
+    fun observeGoalContributions(): Flow<List<GoalContribution>> =
+        goalContributionDao.observeAll().map { list -> list.map { it.toDomain() } }
+
     suspend fun addGoal(goal: Goal): Long = goalDao.upsert(goal.toEntity())
     suspend fun updateGoal(goal: Goal) { goalDao.upsert(goal.toEntity()) }
-    suspend fun deleteGoal(goal: Goal) = goalDao.delete(goal.toEntity())
+    suspend fun deleteGoal(goal: Goal) {
+        goalContributionDao.deleteByGoal(goal.id)
+        goalDao.delete(goal.toEntity())
+    }
 
     /**
      * Moves [amount] between a goal and an account.
-     *  - amount > 0 → deposit into goal, debited from [accountId].
-     *  - amount < 0 → withdraw from goal, credited back to [accountId].
-     * The goal's saved amount never goes below 0, and the account balance is
-     * adjusted by exactly the realized delta (so money is moved, not created).
+     *  - amount > 0 → deposit into goal, sourced from [accountId].
+     *  - amount < 0 → withdraw from goal, returned to [accountId].
+     *
+     * **Key change vs. previous version**: account.initialBalance is NOT modified.
+     * The money is still physically on the account; the goal only represents an
+     * "earmark". The full balance is always shown on the account card.
+     *
+     * Every deposit/withdrawal is recorded in [goal_contributions] so we know
+     * exactly which accounts funded the goal and by how much.
      */
     suspend fun contributeToGoal(goalId: Long, accountId: Long, amount: Double) {
         val goal = goalDao.getById(goalId)?.toDomain() ?: return
-        val account = accountDao.getById(accountId)?.toDomain() ?: return
+        accountDao.getById(accountId) ?: return // validate account exists
         val newSaved = (goal.savedAmount + amount).coerceAtLeast(0.0)
         val realized = newSaved - goal.savedAmount
         if (realized == 0.0) return
-        // Remember which account this goal's money is tied to (for display).
+
+        // 1. Update the goal's saved amount (keep linkedAccountId for compat)
         goalDao.upsert(goal.copy(savedAmount = newSaved, linkedAccountId = accountId).toEntity())
-        accountDao.upsert(account.copy(initialBalance = account.initialBalance - realized).toEntity())
+
+        // 2. Record the contribution so the UI can show all contributing accounts
+        goalContributionDao.insert(
+            GoalContribution(
+                goalId = goalId,
+                accountId = accountId,
+                amount = realized,
+                date = System.currentTimeMillis()
+            ).toEntity()
+        )
+        // Note: account.initialBalance is intentionally NOT changed.
     }
 
-    // ---- Interest / capitalization ----
+    // ─── Interest / capitalization ───────────────────────────────────────────
+
     /**
      * Accrues interest for every savings account whose payout period(s) elapsed
      * since [lastInterestAt] (or createdAt). Interest is booked as INCOME
-     * transactions in the "Капитализация" category, so it shows up everywhere
-     * balances are derived from transactions. Idempotent — safe to call on launch.
+     * transactions in the "Капитализация" category.
+     *
+     * For **daily** interest: uses 24 h (DAY_MS) periods.
+     * For **monthly** interest: advances calendar month-by-month, landing on
+     * [Account.interestPayoutDay] (clamped to the month's actual max day).
+     *
+     * Idempotent — safe to call on every launch.
      */
     suspend fun applyInterestAccruals(now: Long = System.currentTimeMillis()) {
         val savings = accountDao.getAll().map { it.toDomain() }.filter { it.hasInterest }
         if (savings.isEmpty()) return
         var capCategoryId: Long? = null
+
         for (acc in savings) {
             val period = acc.interestPeriod ?: continue
-            val periodMs = when (period) {
-                InterestPeriod.DAILY -> DAY_MS
-                InterestPeriod.MONTHLY -> 30L * DAY_MS
-            }
             val base = acc.lastInterestAt ?: acc.createdAt
             if (now <= base) continue
-            val periods = ((now - base) / periodMs).toInt().coerceIn(0, MAX_PERIODS)
-            if (periods <= 0) continue
+
             val ratePerPeriod = acc.interestRate / 100.0 / period.periodsPerYear
-            val advanceTo = base + periods.toLong() * periodMs
             if (ratePerPeriod <= 0.0) {
-                accountDao.update(acc.copy(lastInterestAt = advanceTo).toEntity())
+                // Zero rate — just advance the clock
+                accountDao.update(acc.copy(lastInterestAt = now).toEntity())
                 continue
             }
-            var balance = acc.initialBalance + transactionDao.balanceDelta(acc.id)
-            var interestTotal = 0.0
-            repeat(periods) {
-                val gain = balance * ratePerPeriod
-                interestTotal += gain
-                balance += gain
+
+            when (period) {
+                InterestPeriod.DAILY -> {
+                    val periodMs = DAY_MS
+                    val periods = ((now - base) / periodMs).toInt().coerceIn(0, MAX_PERIODS)
+                    if (periods <= 0) continue
+                    val advanceTo = base + periods.toLong() * periodMs
+                    val interest = compoundInterest(acc, ratePerPeriod, periods)
+                    if (interest > 0.0) {
+                        if (capCategoryId == null) capCategoryId = ensureCapitalizationCategory()
+                        bookInterest(acc, interest, capCategoryId, now)
+                    }
+                    accountDao.update(acc.copy(lastInterestAt = advanceTo).toEntity())
+                }
+
+                InterestPeriod.MONTHLY -> {
+                    // Advance month-by-month using the chosen payoutDay
+                    val payouts = monthlyPayoutTimestamps(base, now, acc.interestPayoutDay, acc.interestPayoutMinute)
+                    if (payouts.isEmpty()) continue
+                    val periods = payouts.size.coerceAtMost(MAX_PERIODS)
+                    val interest = compoundInterest(acc, ratePerPeriod, periods)
+                    if (interest > 0.0) {
+                        if (capCategoryId == null) capCategoryId = ensureCapitalizationCategory()
+                        bookInterest(acc, interest, capCategoryId, now)
+                    }
+                    accountDao.update(acc.copy(lastInterestAt = payouts.last()).toEntity())
+                }
             }
-            val rounded = round2(interestTotal)
-            if (rounded > 0.0) {
-                if (capCategoryId == null) capCategoryId = ensureCapitalizationCategory()
-                transactionDao.upsert(
-                    Transaction(
-                        amount = rounded,
-                        type = TransactionType.INCOME,
-                        accountId = acc.id,
-                        categoryId = capCategoryId,
-                        note = "Проценты по счёту «${acc.name}»",
-                        date = now
-                    ).toEntity()
-                )
-            }
-            accountDao.update(acc.copy(lastInterestAt = advanceTo).toEntity())
         }
+    }
+
+    /**
+     * Returns a list of payout timestamps falling between (base, now] using
+     * the given day-of-month and minute-of-day.
+     */
+    private fun monthlyPayoutTimestamps(
+        base: Long,
+        now: Long,
+        payoutDay: Int,
+        payoutMinute: Int
+    ): List<Long> {
+        val result = mutableListOf<Long>()
+        val cal = Calendar.getInstance().apply { timeInMillis = base }
+        // Start from the month after base and move forward
+        cal.add(Calendar.MONTH, 1)
+        for (i in 0 until MAX_PERIODS) {
+            val maxDay = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+            cal.set(Calendar.DAY_OF_MONTH, payoutDay.coerceAtMost(maxDay))
+            cal.set(Calendar.HOUR_OF_DAY, payoutMinute / 60)
+            cal.set(Calendar.MINUTE, payoutMinute % 60)
+            cal.set(Calendar.SECOND, 0)
+            cal.set(Calendar.MILLISECOND, 0)
+            val ts = cal.timeInMillis
+            if (ts > now) break
+            if (ts > base) result += ts
+            cal.add(Calendar.MONTH, 1)
+        }
+        return result
+    }
+
+    /** Compound interest across [periods] at [ratePerPeriod] on [acc]'s current balance. */
+    private suspend fun compoundInterest(acc: Account, ratePerPeriod: Double, periods: Int): Double {
+        var balance = acc.initialBalance + transactionDao.balanceDelta(acc.id)
+        var total = 0.0
+        repeat(periods) {
+            val gain = balance * ratePerPeriod
+            total += gain
+            balance += gain
+        }
+        return round2(total)
+    }
+
+    /** Book an interest income transaction. */
+    private suspend fun bookInterest(acc: Account, amount: Double, categoryId: Long, date: Long) {
+        transactionDao.upsert(
+            Transaction(
+                amount = amount,
+                type = TransactionType.INCOME,
+                accountId = acc.id,
+                categoryId = categoryId,
+                note = "Проценты по счёту «${acc.name}»",
+                date = date
+            ).toEntity()
+        )
     }
 
     private suspend fun ensureCapitalizationCategory(): Long {
@@ -192,7 +310,8 @@ class FinanceRepository(private val db: AppDatabase) {
 
     private fun round2(value: Double): Double = kotlin.math.round(value * 100.0) / 100.0
 
-    // ---- Seeding ----
+    // ─── Seeding ─────────────────────────────────────────────────────────────
+
     suspend fun ensureSeeded() {
         if (categoryDao.count() == 0) {
             categoryDao.insertAll(DefaultData.categories())

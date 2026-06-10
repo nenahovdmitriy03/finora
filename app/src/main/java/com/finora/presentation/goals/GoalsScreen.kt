@@ -41,6 +41,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.finora.domain.model.AccountBalance
 import com.finora.domain.model.Goal
+import com.finora.domain.model.GoalAccountSummary
 import com.finora.presentation.AppViewModelProvider
 import com.finora.presentation.components.ColorPickerRow
 import com.finora.presentation.components.EmptyState
@@ -57,7 +58,7 @@ import kotlin.math.roundToInt
 fun GoalsScreen(
     viewModel: GoalsViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
-    val goals by viewModel.goals.collectAsStateWithLifecycle()
+    val goalsWithSources by viewModel.goalsWithSources.collectAsStateWithLifecycle()
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()
     var editorGoal by remember { mutableStateOf<Goal?>(null) }
     var showEditor by remember { mutableStateOf(false) }
@@ -81,7 +82,7 @@ fun GoalsScreen(
             )
         }
 
-        if (goals.isEmpty()) {
+        if (goalsWithSources.isEmpty()) {
             item {
                 FinoraCard {
                     EmptyState(
@@ -92,13 +93,13 @@ fun GoalsScreen(
                 }
             }
         } else {
-            items(goals.size) { index ->
-                val goal = goals[index]
+            items(goalsWithSources.size) { index ->
+                val gws = goalsWithSources[index]
                 GoalCard(
-                    goal = goal,
-                    sourceAccount = accounts.firstOrNull { it.account.id == goal.linkedAccountId },
-                    onEdit = { editorGoal = goal; showEditor = true },
-                    onContribute = { contributeGoal = goal }
+                    goal = gws.goal,
+                    sources = gws.sources,
+                    onEdit = { editorGoal = gws.goal; showEditor = true },
+                    onContribute = { contributeGoal = gws.goal }
                 )
             }
         }
@@ -138,10 +139,12 @@ fun GoalsScreen(
     }
 }
 
+// ─── Goal Card ───────────────────────────────────────────────────────────────
+
 @Composable
 private fun GoalCard(
     goal: Goal,
-    sourceAccount: AccountBalance?,
+    sources: List<GoalAccountSummary>,
     onEdit: () -> Unit,
     onContribute: () -> Unit
 ) {
@@ -179,10 +182,22 @@ private fun GoalCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        if (sourceAccount != null) {
+
+        // Show ALL contributing accounts (not just the last one)
+        if (sources.isNotEmpty()) {
             Spacer(Modifier.height(12.dp))
-            SourceAccountRow(source = sourceAccount, takenAmount = goal.savedAmount)
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                sources.forEach { summary ->
+                    SourceAccountRow(
+                        accountName = summary.account.name,
+                        accountIconKey = summary.account.iconKey,
+                        accountColor = Color(summary.account.color),
+                        amount = summary.netAmount
+                    )
+                }
+            }
         }
+
         Spacer(Modifier.height(12.dp))
         FilledTonalButton(onClick = onContribute, modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -192,10 +207,14 @@ private fun GoalCard(
     }
 }
 
-/** A subtle chip showing which account funds this goal and how much was taken from it. */
+/** A subtle chip showing one contributing account and how much it contributed. */
 @Composable
-private fun SourceAccountRow(source: AccountBalance, takenAmount: Double) {
-    val accColor = Color(source.account.color)
+private fun SourceAccountRow(
+    accountName: String,
+    accountIconKey: String,
+    accountColor: Color,
+    amount: Double
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -204,28 +223,30 @@ private fun SourceAccountRow(source: AccountBalance, takenAmount: Double) {
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconChip(iconKey = source.account.iconKey, color = accColor, size = 30.dp)
+        IconChip(iconKey = accountIconKey, color = accountColor, size = 30.dp)
         Spacer(Modifier.width(10.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                "Счёт цели · ${source.account.name}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                "Взято со счёта",
+                accountName,
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onBackground
             )
+            Text(
+                "Вложено со счёта",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
         Text(
-            formatMoney(takenAmount),
+            formatMoney(amount),
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onBackground
         )
     }
 }
+
+// ─── Goal Editor Dialog ──────────────────────────────────────────────────────
 
 @Composable
 private fun GoalEditorDialog(
@@ -290,6 +311,8 @@ private fun GoalEditorDialog(
         }
     )
 }
+
+// ─── Contribute Dialog ───────────────────────────────────────────────────────
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable

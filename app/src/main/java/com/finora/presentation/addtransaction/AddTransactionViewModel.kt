@@ -11,11 +11,15 @@ import com.finora.domain.model.Account
 import com.finora.domain.model.Category
 import com.finora.domain.model.Transaction
 import com.finora.domain.model.TransactionType
+import com.finora.domain.model.Transfer
 import com.finora.presentation.util.sanitizeMoneyInput
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+/** UI-level mode — includes TRANSFER which is not a TransactionType. */
+enum class EntryMode { EXPENSE, INCOME, TRANSFER }
 
 class AddTransactionViewModel(private val repository: FinanceRepository) : ViewModel() {
 
@@ -25,11 +29,23 @@ class AddTransactionViewModel(private val repository: FinanceRepository) : ViewM
     val categories: StateFlow<List<Category>> = repository.observeCategories()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    var type by mutableStateOf(TransactionType.EXPENSE)
+    var mode by mutableStateOf(EntryMode.EXPENSE)
         private set
+
+    /** Convenience accessor: EXPENSE/INCOME → corresponding TransactionType. */
+    val type: TransactionType
+        get() = when (mode) {
+            EntryMode.EXPENSE -> TransactionType.EXPENSE
+            EntryMode.INCOME -> TransactionType.INCOME
+            EntryMode.TRANSFER -> TransactionType.EXPENSE // unused for transfers
+        }
+
     var amountText by mutableStateOf("")
         private set
     var accountId by mutableStateOf<Long?>(null)
+        private set
+    /** Destination account for transfers. */
+    var toAccountId by mutableStateOf<Long?>(null)
         private set
     var categoryId by mutableStateOf<Long?>(null)
         private set
@@ -46,13 +62,23 @@ class AddTransactionViewModel(private val repository: FinanceRepository) : ViewM
         get() = amountText.replace(',', '.').replace("\u00A0", "").replace(" ", "").toDoubleOrNull() ?: 0.0
 
     val canSave: Boolean
-        get() = amount > 0.0 && accountId != null
-
-    fun updateType(value: TransactionType) {
-        if (type != value) {
-            type = value
-            categoryId = null
+        get() = when (mode) {
+            EntryMode.EXPENSE, EntryMode.INCOME -> amount > 0.0 && accountId != null
+            EntryMode.TRANSFER -> amount > 0.0 && accountId != null && toAccountId != null && accountId != toAccountId
         }
+
+    fun updateMode(value: EntryMode) {
+        if (mode != value) {
+            mode = value
+            categoryId = null
+            // Reset toAccountId when leaving transfer mode
+            if (value != EntryMode.TRANSFER) toAccountId = null
+        }
+    }
+
+    /** Legacy compat — called from TypeToggle when only INCOME/EXPENSE */
+    fun updateType(value: TransactionType) {
+        updateMode(if (value == TransactionType.INCOME) EntryMode.INCOME else EntryMode.EXPENSE)
     }
 
     fun setAmount(value: String) {
@@ -60,6 +86,7 @@ class AddTransactionViewModel(private val repository: FinanceRepository) : ViewM
     }
 
     fun setAccount(id: Long) { accountId = id }
+    fun setToAccount(id: Long) { toAccountId = id }
     fun setCategory(id: Long?) { categoryId = id }
 
     /** Creates a custom category of the current [type] and selects it. */
@@ -78,6 +105,7 @@ class AddTransactionViewModel(private val repository: FinanceRepository) : ViewM
             categoryId = id
         }
     }
+
     fun updateNote(value: String) { note = value }
     fun setDate(millis: Long) { dateMillis = millis }
 
@@ -90,7 +118,7 @@ class AddTransactionViewModel(private val repository: FinanceRepository) : ViewM
         viewModelScope.launch {
             repository.getTransaction(id)?.let { tx ->
                 editingId = tx.id
-                type = tx.type
+                mode = if (tx.type == TransactionType.INCOME) EntryMode.INCOME else EntryMode.EXPENSE
                 amountText = if (tx.amount % 1.0 == 0.0) tx.amount.toLong().toString() else tx.amount.toString()
                 accountId = tx.accountId
                 categoryId = tx.categoryId
@@ -107,6 +135,13 @@ class AddTransactionViewModel(private val repository: FinanceRepository) : ViewM
     }
 
     fun save(onDone: () -> Unit) {
+        when (mode) {
+            EntryMode.EXPENSE, EntryMode.INCOME -> saveTransaction(onDone)
+            EntryMode.TRANSFER -> saveTransfer(onDone)
+        }
+    }
+
+    private fun saveTransaction(onDone: () -> Unit) {
         val accId = accountId ?: return
         if (amount <= 0.0) return
         viewModelScope.launch {
@@ -117,6 +152,25 @@ class AddTransactionViewModel(private val repository: FinanceRepository) : ViewM
                     type = type,
                     accountId = accId,
                     categoryId = categoryId,
+                    note = note.trim(),
+                    date = dateMillis,
+                    createdAt = System.currentTimeMillis()
+                )
+            )
+            onDone()
+        }
+    }
+
+    private fun saveTransfer(onDone: () -> Unit) {
+        val fromId = accountId ?: return
+        val toId = toAccountId ?: return
+        if (fromId == toId || amount <= 0.0) return
+        viewModelScope.launch {
+            repository.addTransfer(
+                Transfer(
+                    fromAccountId = fromId,
+                    toAccountId = toId,
+                    amount = amount,
                     note = note.trim(),
                     date = dateMillis,
                     createdAt = System.currentTimeMillis()

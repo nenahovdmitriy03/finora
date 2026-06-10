@@ -13,7 +13,9 @@ class AppContainer(context: Context) {
         context.applicationContext,
         AppDatabase::class.java,
         AppDatabase.NAME
-    ).build()
+    )
+        .addMigrations(AppDatabase.MIGRATION_1_2)
+        .build()
 
     val repository: FinanceRepository = FinanceRepository(database)
 

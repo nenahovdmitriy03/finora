@@ -18,7 +18,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.finora.domain.model.TransactionDetails
 import com.finora.domain.model.TransactionType
-import com.finora.presentation.theme.LocalFinoraColors
 import com.finora.presentation.util.formatSigned
 
 @Composable
@@ -28,7 +27,6 @@ fun TransactionRow(
     onClick: (() -> Unit)? = null
 ) {
     val tx = details.transaction
-    val colors = LocalFinoraColors.current
     val category = details.category
     val accentColor = Color(category?.color ?: 0xFFB2BEC3)
     val title = category?.name ?: if (tx.type == TransactionType.INCOME) "Доход" else "Расход"
@@ -67,7 +65,8 @@ fun TransactionRow(
             text = formatSigned(tx.amount, tx.type),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
-            color = if (tx.type == TransactionType.INCOME) colors.income else MaterialTheme.colorScheme.onBackground
+            // Neutral style — income/expense is conveyed by the +/- sign, not colour.
+            color = MaterialTheme.colorScheme.onBackground
         )
     }
 }

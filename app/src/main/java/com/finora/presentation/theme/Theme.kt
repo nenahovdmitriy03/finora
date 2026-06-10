@@ -18,11 +18,20 @@ import com.finora.domain.model.AccentColor
 data class FinoraColors(
     val income: Color,
     val expense: Color,
-    val cardElevated: Color
+    val cardElevated: Color,
+    /** Accent gradient used by hero surfaces (Home balance card). Follows the picked accent. */
+    val brandStart: Color,
+    val brandEnd: Color
 )
 
 val LocalFinoraColors = staticCompositionLocalOf {
-    FinoraColors(income = IncomeGreen, expense = ExpenseRed, cardElevated = LightSurface)
+    FinoraColors(
+        income = IncomeGreen,
+        expense = ExpenseRed,
+        cardElevated = LightSurface,
+        brandStart = Violet,
+        brandEnd = VioletDark
+    )
 }
 
 private fun lightColors(accent: AccentColor) = lightColorScheme(
@@ -71,7 +80,9 @@ fun FinoraTheme(
     val finoraColors = FinoraColors(
         income = IncomeGreen,
         expense = ExpenseRed,
-        cardElevated = if (darkTheme) DarkSurfaceVariantSolid else LightSurface
+        cardElevated = if (darkTheme) DarkSurfaceVariantSolid else LightSurface,
+        brandStart = Color(accent.seed),
+        brandEnd = Color(accent.seedDark)
     )
 
     val view = LocalView.current

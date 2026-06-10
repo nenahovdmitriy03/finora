@@ -49,5 +49,7 @@ data class GoalEntity(
     val iconKey: String,
     val color: Long,
     val deadline: Long?,
-    val createdAt: Long
+    val createdAt: Long,
+    /** Account the goal is funded from (last used in a contribution). Nullable for legacy rows. */
+    val linkedAccountId: Long? = null
 )

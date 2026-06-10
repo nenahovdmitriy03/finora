@@ -85,7 +85,8 @@ fun GoalEntity.toDomain() = Goal(
     iconKey = iconKey,
     color = color,
     deadline = deadline,
-    createdAt = createdAt
+    createdAt = createdAt,
+    linkedAccountId = linkedAccountId
 )
 
 fun Goal.toEntity() = GoalEntity(
@@ -96,5 +97,6 @@ fun Goal.toEntity() = GoalEntity(
     iconKey = iconKey,
     color = color,
     deadline = deadline,
-    createdAt = createdAt
+    createdAt = createdAt,
+    linkedAccountId = linkedAccountId
 )

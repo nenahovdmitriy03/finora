@@ -96,6 +96,7 @@ fun GoalsScreen(
                 val goal = goals[index]
                 GoalCard(
                     goal = goal,
+                    sourceAccount = accounts.firstOrNull { it.account.id == goal.linkedAccountId },
                     onEdit = { editorGoal = goal; showEditor = true },
                     onContribute = { contributeGoal = goal }
                 )
@@ -115,7 +116,8 @@ fun GoalsScreen(
                     iconKey = icon,
                     color = color,
                     deadline = editorGoal?.deadline,
-                    saved = editorGoal?.savedAmount ?: 0.0
+                    saved = editorGoal?.savedAmount ?: 0.0,
+                    linkedAccountId = editorGoal?.linkedAccountId
                 )
                 showEditor = false
             },
@@ -137,7 +139,12 @@ fun GoalsScreen(
 }
 
 @Composable
-private fun GoalCard(goal: Goal, onEdit: () -> Unit, onContribute: () -> Unit) {
+private fun GoalCard(
+    goal: Goal,
+    sourceAccount: AccountBalance?,
+    onEdit: () -> Unit,
+    onContribute: () -> Unit
+) {
     val color = Color(goal.color)
     FinoraCard(modifier = Modifier.clickable { onEdit() }) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -172,12 +179,51 @@ private fun GoalCard(goal: Goal, onEdit: () -> Unit, onContribute: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+        if (sourceAccount != null) {
+            Spacer(Modifier.height(12.dp))
+            SourceAccountRow(sourceAccount)
+        }
         Spacer(Modifier.height(12.dp))
         FilledTonalButton(onClick = onContribute, modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(6.dp))
             Text("Пополнить")
         }
+    }
+}
+
+/** A subtle chip showing which account this goal's money comes from. */
+@Composable
+private fun SourceAccountRow(source: AccountBalance) {
+    val accColor = Color(source.account.color)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.medium)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconChip(iconKey = source.account.iconKey, color = accColor, size = 30.dp)
+        Spacer(Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                "Счёт цели",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                source.account.name,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+        }
+        Text(
+            formatMoney(source.balance),
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onBackground
+        )
     }
 }
 

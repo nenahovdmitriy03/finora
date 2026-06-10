@@ -43,9 +43,8 @@ import com.finora.presentation.components.DonutChart
 import com.finora.presentation.components.DonutSlice
 import com.finora.presentation.components.EmptyState
 import com.finora.presentation.components.FinoraCard
-import com.finora.presentation.components.TrendBar
-import com.finora.presentation.components.TrendChart
-import com.finora.presentation.theme.LocalFinoraColors
+import com.finora.presentation.components.NetBar
+import com.finora.presentation.components.NetTrendChart
 import com.finora.presentation.util.formatMoney
 import kotlin.math.roundToInt
 
@@ -54,7 +53,6 @@ fun StatisticsScreen(
     viewModel: StatisticsViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val colors = LocalFinoraColors.current
     var showExpense by remember { mutableStateOf(true) }
 
     LazyColumn(
@@ -100,13 +98,13 @@ fun StatisticsScreen(
                     modifier = Modifier.weight(1f),
                     label = "Доходы",
                     amount = state.income,
-                    color = colors.income
+                    color = MaterialTheme.colorScheme.primary
                 )
                 SummaryTile(
                     modifier = Modifier.weight(1f),
                     label = "Расходы",
                     amount = state.expense,
-                    color = colors.expense
+                    color = MaterialTheme.colorScheme.onBackground
                 )
             }
         }
@@ -114,15 +112,21 @@ fun StatisticsScreen(
         item {
             FinoraCard {
                 Text(
-                    "Динамика за 6 месяцев",
+                    "Чистый поток за 6 месяцев",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onBackground
                 )
+                Text(
+                    "Доходы минус расходы по месяцам",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 Spacer(Modifier.height(16.dp))
-                TrendChart(
-                    bars = state.trend.map { TrendBar(it.label, it.income.toFloat(), it.expense.toFloat()) },
-                    incomeColor = colors.income,
-                    expenseColor = colors.expense,
+                NetTrendChart(
+                    bars = state.trend.map { NetBar(it.label, (it.income - it.expense).toFloat()) },
+                    positiveColor = MaterialTheme.colorScheme.primary,
+                    negativeColor = MaterialTheme.colorScheme.outline,
+                    baselineColor = MaterialTheme.colorScheme.surfaceVariant,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(150.dp)
@@ -139,8 +143,8 @@ fun StatisticsScreen(
                 }
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    LegendDot(colors.income, "Доход")
-                    LegendDot(colors.expense, "Расход")
+                    LegendDot(MaterialTheme.colorScheme.primary, "Плюс")
+                    LegendDot(MaterialTheme.colorScheme.outline, "Минус")
                 }
             }
         }

@@ -45,8 +45,7 @@ import com.finora.presentation.components.FinoraCard
 import com.finora.presentation.components.IconChip
 import com.finora.presentation.components.SectionHeader
 import com.finora.presentation.components.TransactionRow
-import com.finora.presentation.theme.Violet
-import com.finora.presentation.theme.VioletDark
+import com.finora.presentation.theme.LocalFinoraColors
 import com.finora.presentation.util.formatMoney
 
 @Composable
@@ -136,6 +135,7 @@ private fun Header() {
 
 @Composable
 private fun BalanceHero(state: HomeUiState) {
+    val finora = LocalFinoraColors.current
     Surface(
         shape = MaterialTheme.shapes.extraLarge,
         modifier = Modifier.fillMaxWidth()
@@ -143,7 +143,7 @@ private fun BalanceHero(state: HomeUiState) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Brush.linearGradient(listOf(Violet, VioletDark)))
+                .background(Brush.linearGradient(listOf(finora.brandStart, finora.brandEnd)))
         ) {
             Column(modifier = Modifier.fillMaxWidth().padding(22.dp)) {
                 Text(

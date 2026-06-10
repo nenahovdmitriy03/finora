@@ -60,7 +60,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.finora.domain.model.TransactionType
 import com.finora.presentation.AppViewModelProvider
 import com.finora.presentation.components.IconChip
-import com.finora.presentation.theme.LocalFinoraColors
 import com.finora.presentation.util.ThousandsVisualTransformation
 import com.finora.presentation.util.expenseIconKeys
 import com.finora.presentation.util.formatFullDate
@@ -75,7 +74,6 @@ fun AddTransactionScreen(
 ) {
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
-    val colors = LocalFinoraColors.current
 
     LaunchedEffect(transactionId) { viewModel.load(transactionId) }
     LaunchedEffect(accounts) { viewModel.ensureDefaultAccount() }
@@ -85,7 +83,7 @@ fun AddTransactionScreen(
 
     val visibleCategories = categories.filter { it.type == viewModel.type }
     val selectedCategory = visibleCategories.firstOrNull { it.id == viewModel.categoryId }
-    val accentColor = if (viewModel.type == TransactionType.INCOME) colors.income else colors.expense
+    val accentColor = MaterialTheme.colorScheme.primary
     val isEditing = viewModel.editingId != null
 
     Scaffold(
@@ -125,9 +123,7 @@ fun AddTransactionScreen(
             // Type toggle
             TypeToggle(
                 type = viewModel.type,
-                onChange = viewModel::updateType,
-                incomeColor = colors.income,
-                expenseColor = colors.expense
+                onChange = viewModel::updateType
             )
             Spacer(Modifier.height(20.dp))
 
@@ -135,7 +131,7 @@ fun AddTransactionScreen(
             AmountField(
                 value = viewModel.amountText,
                 onValueChange = viewModel::setAmount,
-                accent = if (viewModel.type == TransactionType.INCOME) colors.income else colors.expense
+                accent = MaterialTheme.colorScheme.primary
             )
             Spacer(Modifier.height(24.dp))
 
@@ -294,10 +290,10 @@ fun AddTransactionScreen(
 @Composable
 private fun TypeToggle(
     type: TransactionType,
-    onChange: (TransactionType) -> Unit,
-    incomeColor: Color,
-    expenseColor: Color
+    onChange: (TransactionType) -> Unit
 ) {
+    // Neutral toggle: the selected side uses the app accent (no green/red).
+    val accent = MaterialTheme.colorScheme.primary
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -308,13 +304,13 @@ private fun TypeToggle(
         ToggleHalf(
             label = "Расход",
             selected = type == TransactionType.EXPENSE,
-            selectedColor = expenseColor,
+            selectedColor = accent,
             modifier = Modifier.weight(1f)
         ) { onChange(TransactionType.EXPENSE) }
         ToggleHalf(
             label = "Доход",
             selected = type == TransactionType.INCOME,
-            selectedColor = incomeColor,
+            selectedColor = accent,
             modifier = Modifier.weight(1f)
         ) { onChange(TransactionType.INCOME) }
     }

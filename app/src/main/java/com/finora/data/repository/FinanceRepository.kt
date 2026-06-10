@@ -111,7 +111,8 @@ class FinanceRepository(private val db: AppDatabase) {
         val newSaved = (goal.savedAmount + amount).coerceAtLeast(0.0)
         val realized = newSaved - goal.savedAmount
         if (realized == 0.0) return
-        goalDao.upsert(goal.copy(savedAmount = newSaved).toEntity())
+        // Remember which account this goal's money is tied to (for display).
+        goalDao.upsert(goal.copy(savedAmount = newSaved, linkedAccountId = accountId).toEntity())
         accountDao.upsert(account.copy(initialBalance = account.initialBalance - realized).toEntity())
     }
 

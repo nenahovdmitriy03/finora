@@ -26,7 +26,6 @@ import com.finora.presentation.AppViewModelProvider
 import com.finora.presentation.components.EmptyState
 import com.finora.presentation.components.FinoraCard
 import com.finora.presentation.components.TransactionRow
-import com.finora.presentation.theme.LocalFinoraColors
 import com.finora.presentation.util.formatMoney
 import com.finora.presentation.util.relativeDayLabel
 
@@ -36,7 +35,6 @@ fun TransactionsScreen(
     viewModel: TransactionsViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val colors = LocalFinoraColors.current
 
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
@@ -87,7 +85,7 @@ fun TransactionsScreen(
                             text = formatMoney(net),
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold,
-                            color = if (net >= 0) colors.income else MaterialTheme.colorScheme.onSurfaceVariant
+                            color = if (net >= 0) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }

@@ -69,53 +69,58 @@ fun DonutChart(
     }
 }
 
-data class TrendBar(val label: String, val income: Float, val expense: Float)
+data class NetBar(val label: String, val net: Float)
 
-/** Grouped income/expense bars over time. Rendered as rounded vertical bars. */
+/**
+ * Net cash-flow per period (income − expense) drawn as bars around a zero baseline.
+ * Up bars (surplus) use [positiveColor], down bars (deficit) use [negativeColor] —
+ * dynamics are shown by direction, not by red/green.
+ */
 @Composable
-fun TrendChart(
-    bars: List<TrendBar>,
-    incomeColor: Color,
-    expenseColor: Color,
-    modifier: Modifier = Modifier,
-    height: Dp = 160.dp
+fun NetTrendChart(
+    bars: List<NetBar>,
+    positiveColor: Color,
+    negativeColor: Color,
+    baselineColor: Color,
+    modifier: Modifier = Modifier
 ) {
-    val max = bars.maxOfOrNull { maxOf(it.income, it.expense) }?.takeIf { it > 0f } ?: 1f
+    val maxAbs = bars.maxOfOrNull { kotlin.math.abs(it.net) }?.takeIf { it > 0f } ?: 1f
     Canvas(modifier = modifier) {
         if (bars.isEmpty()) return@Canvas
         val groupWidth = this.size.width / bars.size
-        val barWidth = (groupWidth * 0.26f).coerceAtMost(22f.dp.toPx())
-        val gap = barWidth * 0.35f
-        val baseY = this.size.height
+        val barWidth = (groupWidth * 0.42f).coerceAtMost(26f.dp.toPx())
         val radius = barWidth / 2f
+        val zeroY = this.size.height / 2f
+        val halfSpan = this.size.height / 2f - 8f
+
+        // zero baseline
+        drawRoundRect(
+            color = baselineColor,
+            topLeft = Offset(0f, zeroY - 1.dp.toPx()),
+            size = Size(this.size.width, 2.dp.toPx()),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(1.dp.toPx(), 1.dp.toPx())
+        )
 
         bars.forEachIndexed { index, bar ->
-            val groupCenter = groupWidth * index + groupWidth / 2f
-            val incomeHeight = (bar.income / max) * (this.size.height - 8f)
-            val expenseHeight = (bar.expense / max) * (this.size.height - 8f)
-
-            val incomeX = groupCenter - barWidth - gap / 2f
-            val expenseX = groupCenter + gap / 2f
-
-            drawRoundedBar(incomeX, baseY, barWidth, incomeHeight, radius, incomeColor)
-            drawRoundedBar(expenseX, baseY, barWidth, expenseHeight, radius, expenseColor)
+            val center = groupWidth * index + groupWidth / 2f
+            val x = center - barWidth / 2f
+            val h = (kotlin.math.abs(bar.net) / maxAbs) * halfSpan
+            val barH = h.coerceAtLeast(barWidth * 0.5f)
+            if (bar.net >= 0f) {
+                drawRoundRect(
+                    color = positiveColor,
+                    topLeft = Offset(x, zeroY - barH),
+                    size = Size(barWidth, barH),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(radius, radius)
+                )
+            } else {
+                drawRoundRect(
+                    color = negativeColor,
+                    topLeft = Offset(x, zeroY),
+                    size = Size(barWidth, barH),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(radius, radius)
+                )
+            }
         }
     }
-}
-
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawRoundedBar(
-    x: Float,
-    baseY: Float,
-    width: Float,
-    barHeight: Float,
-    radius: Float,
-    color: Color
-) {
-    val h = barHeight.coerceAtLeast(width * 0.6f)
-    drawRoundRect(
-        color = color,
-        topLeft = Offset(x, baseY - h),
-        size = Size(width, h),
-        cornerRadius = androidx.compose.ui.geometry.CornerRadius(radius, radius)
-    )
 }

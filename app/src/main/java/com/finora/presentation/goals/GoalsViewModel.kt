@@ -25,7 +25,8 @@ class GoalsViewModel(private val repository: FinanceRepository) : ViewModel() {
         iconKey: String,
         color: Long,
         deadline: Long?,
-        saved: Double
+        saved: Double,
+        linkedAccountId: Long? = null
     ) {
         if (name.isBlank() || target <= 0.0) return
         viewModelScope.launch {
@@ -37,7 +38,8 @@ class GoalsViewModel(private val repository: FinanceRepository) : ViewModel() {
                     savedAmount = saved.coerceAtLeast(0.0),
                     iconKey = iconKey,
                     color = color,
-                    deadline = deadline
+                    deadline = deadline,
+                    linkedAccountId = linkedAccountId
                 )
             )
         }

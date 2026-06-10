@@ -78,7 +78,9 @@ data class Goal(
     val iconKey: String = "target",
     val color: Long = 0xFF3FB18C,
     val deadline: Long? = null,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    /** Account the goal's money is currently tied to (last contribution source). */
+    val linkedAccountId: Long? = null
 ) {
     val progress: Float
         get() = if (targetAmount <= 0) 0f else (savedAmount / targetAmount).toFloat().coerceIn(0f, 1f)

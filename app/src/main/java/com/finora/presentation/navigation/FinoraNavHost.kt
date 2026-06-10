@@ -148,8 +148,10 @@ private fun FinoraBottomBar(
                 icon = { Icon(item.icon, contentDescription = item.label) },
                 label = { Text(item.label, style = MaterialTheme.typography.labelMedium) },
                 colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = MaterialTheme.colorScheme.primary,
-                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                    // icon sits ON the indicator pill → use the on-container color so it
+                    // stays readable for every accent (fixes the icon being hidden by the color)
+                    selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    selectedTextColor = MaterialTheme.colorScheme.onSurface,
                     indicatorColor = MaterialTheme.colorScheme.primaryContainer,
                     unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant

@@ -126,13 +126,17 @@ fun FinoraNavHost(navController: NavHostController = rememberNavController()) {
         }
     }
 
-    // Auto-sync on start
+    // Auto-sync on start — only upload if Room has data (avoids race condition
+    // on fresh install where uploadAll deletes remote data before downloadAll finishes)
     LaunchedEffect(isAuthenticated) {
         if (isAuthenticated) {
             launch(Dispatchers.IO) {
                 try {
                     val userId = app.container.authRepository.currentUserId()
-                    if (userId != null) app.container.syncManager.uploadAll(userId)
+                    val hasLocalData = app.container.db.accountDao().getAll().isNotEmpty()
+                    if (userId != null && hasLocalData) {
+                        app.container.syncManager.uploadAll(userId)
+                    }
                 } catch (_: Exception) { }
             }
         }

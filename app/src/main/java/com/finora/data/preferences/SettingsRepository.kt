@@ -34,7 +34,7 @@ class SettingsRepository(context: Context) {
 
     val accentColor: Flow<AccentColor> = appContext.dataStore.data.map { prefs ->
         prefs[accentKey]?.let { stored -> runCatching { AccentColor.valueOf(stored) }.getOrNull() }
-            ?: AccentColor.VIOLET
+            ?: AccentColor.BLUE
     }
 
     suspend fun setThemeMode(mode: ThemeMode) {

@@ -125,6 +125,18 @@ fun AuthScreen(
                 Spacer(Modifier.height(8.dp))
             }
 
+            // Info (e.g. "check your email")
+            if (state.info != null) {
+                Text(
+                    state.info!!,
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(8.dp))
+            }
+
             Spacer(Modifier.height(16.dp))
 
             // Submit button

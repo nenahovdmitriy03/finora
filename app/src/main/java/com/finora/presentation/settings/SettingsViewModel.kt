@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 class SettingsViewModel(
     private val settings: SettingsRepository,
@@ -24,10 +25,13 @@ class SettingsViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ThemeMode.SYSTEM)
 
     val accentColor: StateFlow<AccentColor> = settings.accentColor
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AccentColor.VIOLET)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AccentColor.BLUE)
 
     val authState: StateFlow<AuthRepository.AuthState> = authRepo.authState
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AuthRepository.AuthState.Loading)
+
+    private val _isSigningOut = MutableStateFlow(false)
+    val isSigningOut: StateFlow<Boolean> = _isSigningOut.asStateFlow()
 
     sealed interface DeleteStatus {
         data object Idle : DeleteStatus
@@ -49,13 +53,19 @@ class SettingsViewModel(
 
     fun signOut() {
         viewModelScope.launch {
-            // Auto-upload before signing out
+            _isSigningOut.value = true
+            // Upload with 5s timeout — don't block sign-out if network is slow
             try {
                 val userId = authRepo.currentUserId()
-                if (userId != null) syncManager.uploadAll(userId)
+                if (userId != null) {
+                    withTimeoutOrNull(5_000L) {
+                        syncManager.uploadAll(userId)
+                    }
+                }
             } catch (_: Exception) { }
             authRepo.signOut()
             settings.clearOnboardingFlags()
+            _isSigningOut.value = false
         }
     }
 

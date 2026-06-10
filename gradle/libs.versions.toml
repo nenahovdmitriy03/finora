@@ -12,7 +12,7 @@ coroutines = "1.8.1"
 datastore = "1.1.1"
 generativeai = "0.9.0"
 supabase = "3.0.2"
-ktor = "2.3.12"
+ktor = "3.0.1"
 serialization = "1.7.1"
 
 [libraries]
@@ -40,7 +40,7 @@ generativeai = { group = "com.google.ai.client.generativeai", name = "generative
 supabase-bom = { group = "io.github.jan-tennert.supabase", name = "bom", version.ref = "supabase" }
 supabase-postgrest = { group = "io.github.jan-tennert.supabase", name = "postgrest-kt" }
 supabase-auth = { group = "io.github.jan-tennert.supabase", name = "auth-kt" }
-ktor-client-android = { group = "io.ktor", name = "ktor-client-android", version.ref = "ktor" }
+ktor-client-okhttp = { group = "io.ktor", name = "ktor-client-okhttp", version.ref = "ktor" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serialization" }
 
 # Testing

@@ -73,6 +73,7 @@ fun SettingsScreen(
     val accent by viewModel.accentColor.collectAsStateWithLifecycle()
     val authState by viewModel.authState.collectAsStateWithLifecycle()
     val deleteStatus by viewModel.deleteStatus.collectAsStateWithLifecycle()
+    val isSigningOut by viewModel.isSigningOut.collectAsStateWithLifecycle()
     var showDeleteDialog by remember { mutableStateOf(false) }
 
     val guideController = LocalGuideController.current
@@ -112,10 +113,18 @@ fun SettingsScreen(
                         // Logout
                         SettingRow(
                             icon = Icons.AutoMirrored.Rounded.Logout,
-                            title = "Выйти",
-                            subtitle = "Выйти из аккаунта",
-                            onClick = viewModel::signOut,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            title = if (isSigningOut) "Выход…" else "Выйти",
+                            subtitle = if (isSigningOut) "Сохраняю данные" else "Выйти из аккаунта",
+                            onClick = { if (!isSigningOut) viewModel.signOut() },
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            trailing = {
+                                if (isSigningOut) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                }
+                            }
                         )
                         // Delete account
                         SettingRow(

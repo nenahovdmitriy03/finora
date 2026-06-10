@@ -28,6 +28,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.TrackChanges
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -81,7 +82,9 @@ fun AccountsScreen(
     viewModel: AccountsViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    var editorAccount by remember { mutableStateOf<Account?>(null) }
+    // Track the full AccountBalance (not just Account) so the editor can show
+    // the real computed balance, not the raw initialBalance.
+    var editorItem by remember { mutableStateOf<AccountBalance?>(null) }
     var showEditor by remember { mutableStateOf(false) }
 
     LazyColumn(
@@ -102,6 +105,8 @@ fun AccountsScreen(
                 )
             }
         }
+
+        // ─── Summary card: total + goals breakdown ───────────────────────
         item {
             FinoraCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -132,13 +137,70 @@ fun AccountsScreen(
                         )
                     }
                 }
+
+                // Show goals breakdown when there are any
+                if (state.inGoals > 0.0) {
+                    Spacer(Modifier.height(14.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(MaterialTheme.shapes.medium)
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Rounded.TrackChanges,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    "В целях",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    formatMoney(state.inGoals),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                            }
+                            Spacer(Modifier.height(4.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    "Свободно",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    formatMoney(state.free),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
+
         item {
             SectionHeader(
                 title = "Мои счета",
                 action = {
-                    FilledTonalButton(onClick = { editorAccount = null; showEditor = true }) {
+                    FilledTonalButton(onClick = { editorItem = null; showEditor = true }) {
                         Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Text("Добавить")
@@ -161,34 +223,48 @@ fun AccountsScreen(
             items(state.accounts.size) { index ->
                 AccountCard(
                     item = state.accounts[index],
-                    onClick = { editorAccount = state.accounts[index].account; showEditor = true }
+                    onClick = { editorItem = state.accounts[index]; showEditor = true }
                 )
             }
         }
     }
 
     if (showEditor) {
+        val account = editorItem?.account
+        val computedBalance = editorItem?.balance
+
         AccountEditorScreen(
-            initial = editorAccount,
+            initial = account,
+            computedBalance = computedBalance,
             onDismiss = { showEditor = false },
-            onConfirm = { name, type, balance, icon, color, rate, period, payoutMinute, payoutDay ->
+            onConfirm = { name, type, enteredBalance, icon, color, rate, period, payoutMinute, payoutDay ->
+                // When editing, the user enters the desired *real* balance.
+                // We reverse-compute initialBalance:
+                //   computed = initial + txDeltas + transferDeltas
+                //   delta    = computed - initial
+                //   newInitial = enteredBalance - delta
+                val oldInitial = account?.initialBalance ?: 0.0
+                val oldComputed = computedBalance ?: 0.0
+                val externalDelta = oldComputed - oldInitial
+                val newInitialBalance = enteredBalance - externalDelta
+
                 viewModel.saveAccount(
-                    id = editorAccount?.id ?: 0L,
+                    id = account?.id ?: 0L,
                     name = name,
                     type = type,
-                    initialBalance = balance,
+                    initialBalance = newInitialBalance,
                     iconKey = icon,
                     color = color,
                     interestRate = rate,
                     interestPeriod = period,
                     interestPayoutMinute = payoutMinute,
                     interestPayoutDay = payoutDay,
-                    previousLastInterestAt = editorAccount?.lastInterestAt,
-                    previouslyHadInterest = editorAccount?.hasInterest == true
+                    previousLastInterestAt = account?.lastInterestAt,
+                    previouslyHadInterest = account?.hasInterest == true
                 )
                 showEditor = false
             },
-            onDelete = editorAccount?.let { acc -> { viewModel.delete(acc); showEditor = false } }
+            onDelete = account?.let { acc -> { viewModel.delete(acc); showEditor = false } }
         )
     }
 }
@@ -232,10 +308,16 @@ private fun AccountCard(item: AccountBalance, onClick: () -> Unit) {
     }
 }
 
+/**
+ * Full-screen account editor. When [initial] is non-null (editing), the balance
+ * field shows the real computed balance (not the raw [Account.initialBalance]).
+ * The caller reverse-computes initialBalance when saving.
+ */
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun AccountEditorScreen(
     initial: Account?,
+    computedBalance: Double?,
     onDismiss: () -> Unit,
     onConfirm: (
         name: String,
@@ -251,9 +333,13 @@ private fun AccountEditorScreen(
     onDelete: (() -> Unit)?
 ) {
     var name by remember { mutableStateOf(initial?.name ?: "") }
+
+    // KEY FIX: when editing, show the computed balance (what the user sees on the
+    // card), not the raw initialBalance which confused the user.
     var balance by remember {
+        val displayBalance = if (initial != null) computedBalance ?: initial.initialBalance else null
         mutableStateOf(
-            initial?.initialBalance?.let { if (it % 1.0 == 0.0) it.toLong().toString() else it.toString() } ?: ""
+            displayBalance?.let { if (it % 1.0 == 0.0) it.toLong().toString() else it.toString() } ?: ""
         )
     }
     var icon by remember { mutableStateOf(initial?.iconKey ?: "card") }
@@ -278,7 +364,6 @@ private fun AccountEditorScreen(
     ) {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // Top bar
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -325,7 +410,7 @@ private fun AccountEditorScreen(
                     MoneyTextField(
                         value = balance,
                         onValueChange = { balance = it },
-                        label = "Текущий баланс",
+                        label = if (initial != null) "Баланс" else "Текущий баланс",
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(Modifier.height(18.dp))
@@ -391,7 +476,6 @@ private fun AccountEditorScreen(
                             }
                         }
 
-                        // ─── Day of month picker (only for MONTHLY) ─────────
                         if (period == InterestPeriod.MONTHLY) {
                             Spacer(Modifier.height(14.dp))
                             Text("Дата выплаты", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -476,7 +560,6 @@ private fun AccountEditorScreen(
         }
     }
 
-    // ─── Time picker dialog ──────────────────────────────────────────────────
     if (showTimePicker) {
         val timeState = rememberTimePickerState(
             initialHour = payoutMinute / 60,
@@ -503,7 +586,6 @@ private fun AccountEditorScreen(
         )
     }
 
-    // ─── Day of month picker dialog ──────────────────────────────────────────
     if (showDayPicker) {
         DayOfMonthPickerDialog(
             selected = payoutDay,
@@ -513,7 +595,6 @@ private fun AccountEditorScreen(
     }
 }
 
-/** Grid dialog to pick a day of month (1..31). */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DayOfMonthPickerDialog(

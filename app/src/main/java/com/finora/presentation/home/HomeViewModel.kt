@@ -15,13 +15,16 @@ import kotlinx.coroutines.flow.stateIn
 
 data class HomeUiState(
     val totalBalance: Double = 0.0,
+    val inGoals: Double = 0.0,
     val monthIncome: Double = 0.0,
     val monthExpense: Double = 0.0,
     val accounts: List<AccountBalance> = emptyList(),
     val recentTransactions: List<TransactionDetails> = emptyList(),
     val goals: List<Goal> = emptyList(),
     val loading: Boolean = true
-)
+) {
+    val freeBalance: Double get() = (totalBalance - inGoals).coerceAtLeast(0.0)
+}
 
 class HomeViewModel(repository: FinanceRepository) : ViewModel() {
 
@@ -34,6 +37,7 @@ class HomeViewModel(repository: FinanceRepository) : ViewModel() {
         val monthTx = transactions.filter { it.transaction.date >= monthStart }
         HomeUiState(
             totalBalance = accounts.sumOf { it.balance },
+            inGoals = goals.sumOf { it.savedAmount },
             monthIncome = monthTx.filter { it.transaction.type == TransactionType.INCOME }
                 .sumOf { it.transaction.amount },
             monthExpense = monthTx.filter { it.transaction.type == TransactionType.EXPENSE }

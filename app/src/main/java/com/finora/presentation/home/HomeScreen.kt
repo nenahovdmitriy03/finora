@@ -160,7 +160,47 @@ private fun BalanceHero(state: HomeUiState) {
                     style = MaterialTheme.typography.displaySmall,
                     color = Color.White
                 )
-                Spacer(Modifier.height(20.dp))
+                // Show goals breakdown when there are earmarked funds
+                if (state.inGoals > 0.0) {
+                    Spacer(Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Color.White.copy(alpha = 0.12f))
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text(
+                                "В целях",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White.copy(alpha = 0.7f)
+                            )
+                            Text(
+                                formatMoney(state.inGoals),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.White
+                            )
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                "Свободно",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White.copy(alpha = 0.7f)
+                            )
+                            Text(
+                                formatMoney(state.freeBalance),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.White
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(14.dp))
                 Row(modifier = Modifier.fillMaxWidth()) {
                     FlowStat(
                         modifier = Modifier.weight(1f),

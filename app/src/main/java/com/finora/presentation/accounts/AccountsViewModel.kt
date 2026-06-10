@@ -9,20 +9,30 @@ import com.finora.domain.model.AccountType
 import com.finora.domain.model.InterestPeriod
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 data class AccountsUiState(
     val total: Double = 0.0,
+    val inGoals: Double = 0.0,
     val accounts: List<AccountBalance> = emptyList()
-)
+) {
+    val free: Double get() = (total - inGoals).coerceAtLeast(0.0)
+}
 
 class AccountsViewModel(private val repository: FinanceRepository) : ViewModel() {
 
-    val uiState: StateFlow<AccountsUiState> = repository.observeAccountBalances()
-        .map { list -> AccountsUiState(total = list.sumOf { it.balance }, accounts = list) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AccountsUiState())
+    val uiState: StateFlow<AccountsUiState> = combine(
+        repository.observeAccountBalances(),
+        repository.observeGoals()
+    ) { list, goals ->
+        AccountsUiState(
+            total = list.sumOf { it.balance },
+            inGoals = goals.sumOf { it.savedAmount },
+            accounts = list
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AccountsUiState())
 
     fun saveAccount(
         id: Long,
@@ -40,9 +50,6 @@ class AccountsViewModel(private val repository: FinanceRepository) : ViewModel()
     ) {
         if (name.isBlank()) return
         val enabled = interestPeriod != null && interestRate > 0.0
-        // Start accruing from the most recent payout time when interest is newly
-        // enabled (so payouts land at the chosen time of day), otherwise keep the
-        // prior clock so we don't backfill or lose progress.
         val lastInterestAt = when {
             !enabled -> null
             previouslyHadInterest -> previousLastInterestAt ?: lastPayoutInstant(interestPayoutMinute)
@@ -68,7 +75,6 @@ class AccountsViewModel(private val repository: FinanceRepository) : ViewModel()
         }
     }
 
-    /** Most recent wall-clock occurrence of [payoutMinute] (today, or yesterday if not yet reached). */
     private fun lastPayoutInstant(payoutMinute: Int): Long {
         val cal = java.util.Calendar.getInstance()
         cal.set(java.util.Calendar.HOUR_OF_DAY, payoutMinute / 60)

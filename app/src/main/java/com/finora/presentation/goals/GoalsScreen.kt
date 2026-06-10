@@ -4,26 +4,41 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.TrackChanges
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -36,7 +51,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.finora.domain.model.AccountBalance
@@ -60,9 +78,8 @@ fun GoalsScreen(
 ) {
     val goalsWithSources by viewModel.goalsWithSources.collectAsStateWithLifecycle()
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()
-    var editorGoal by remember { mutableStateOf<Goal?>(null) }
-    var showEditor by remember { mutableStateOf(false) }
-    var contributeGoal by remember { mutableStateOf<Goal?>(null) }
+    var showNewGoalDialog by remember { mutableStateOf(false) }
+    var detailGoalId by remember { mutableStateOf<Long?>(null) }
 
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
@@ -73,7 +90,7 @@ fun GoalsScreen(
             SectionHeader(
                 title = "Цели",
                 action = {
-                    FilledTonalButton(onClick = { editorGoal = null; showEditor = true }) {
+                    FilledTonalButton(onClick = { showNewGoalDialog = true }) {
                         Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Text("Новая")
@@ -98,58 +115,77 @@ fun GoalsScreen(
                 GoalCard(
                     goal = gws.goal,
                     sources = gws.sources,
-                    onEdit = { editorGoal = gws.goal; showEditor = true },
-                    onContribute = { contributeGoal = gws.goal }
+                    onClick = { detailGoalId = gws.goal.id }
                 )
             }
         }
     }
 
-    if (showEditor) {
+    // ─── New goal creation dialog ────────────────────────────────────────
+    if (showNewGoalDialog) {
         GoalEditorDialog(
-            initial = editorGoal,
-            onDismiss = { showEditor = false },
+            initial = null,
+            onDismiss = { showNewGoalDialog = false },
             onConfirm = { name, target, icon, color ->
                 viewModel.saveGoal(
-                    id = editorGoal?.id ?: 0L,
+                    id = 0L,
                     name = name,
                     target = target,
                     iconKey = icon,
                     color = color,
-                    deadline = editorGoal?.deadline,
-                    saved = editorGoal?.savedAmount ?: 0.0,
-                    linkedAccountId = editorGoal?.linkedAccountId
+                    deadline = null,
+                    saved = 0.0,
+                    linkedAccountId = null
                 )
-                showEditor = false
+                showNewGoalDialog = false
             },
-            onDelete = editorGoal?.let { g -> { viewModel.delete(g); showEditor = false } }
+            onDelete = null
         )
     }
 
-    contributeGoal?.let { goal ->
-        ContributeDialog(
-            goal = goal,
-            accounts = accounts,
-            onDismiss = { contributeGoal = null },
-            onConfirm = { accountId, delta ->
-                viewModel.contribute(goal.id, accountId, delta)
-                contributeGoal = null
-            }
-        )
+    // ─── Goal detail/edit full-screen ────────────────────────────────────
+    detailGoalId?.let { goalId ->
+        val gws = goalsWithSources.find { it.goal.id == goalId }
+        if (gws != null) {
+            GoalDetailScreen(
+                goal = gws.goal,
+                sources = gws.sources,
+                accounts = accounts,
+                onDismiss = { detailGoalId = null },
+                onContribute = { accountId, amount ->
+                    viewModel.contribute(goalId, accountId, amount)
+                },
+                onSave = { name, target, icon, color ->
+                    viewModel.saveGoal(
+                        id = goalId,
+                        name = name,
+                        target = target,
+                        iconKey = icon,
+                        color = color,
+                        deadline = gws.goal.deadline,
+                        saved = gws.goal.savedAmount,
+                        linkedAccountId = gws.goal.linkedAccountId
+                    )
+                },
+                onDelete = {
+                    viewModel.delete(gws.goal)
+                    detailGoalId = null
+                }
+            )
+        }
     }
 }
 
-// ─── Goal Card ───────────────────────────────────────────────────────────────
+// ─── Goal Card (list item) ───────────────────────────────────────────────────
 
 @Composable
 private fun GoalCard(
     goal: Goal,
     sources: List<GoalAccountSummary>,
-    onEdit: () -> Unit,
-    onContribute: () -> Unit
+    onClick: () -> Unit
 ) {
     val color = Color(goal.color)
-    FinoraCard(modifier = Modifier.clickable { onEdit() }) {
+    FinoraCard(modifier = Modifier.clickable { onClick() }) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconChip(iconKey = goal.iconKey, color = color, size = 48.dp)
             Spacer(Modifier.width(12.dp))
@@ -183,7 +219,6 @@ private fun GoalCard(
             )
         }
 
-        // Show ALL contributing accounts (not just the last one)
         if (sources.isNotEmpty()) {
             Spacer(Modifier.height(12.dp))
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -197,17 +232,9 @@ private fun GoalCard(
                 }
             }
         }
-
-        Spacer(Modifier.height(12.dp))
-        FilledTonalButton(onClick = onContribute, modifier = Modifier.fillMaxWidth()) {
-            Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
-            Text("Пополнить")
-        }
     }
 }
 
-/** A subtle chip showing one contributing account and how much it contributed. */
 @Composable
 private fun SourceAccountRow(
     accountName: String,
@@ -246,7 +273,238 @@ private fun SourceAccountRow(
     }
 }
 
-// ─── Goal Editor Dialog ──────────────────────────────────────────────────────
+// ─── Full-screen Goal Detail / Edit screen ───────────────────────────────────
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun GoalDetailScreen(
+    goal: Goal,
+    sources: List<GoalAccountSummary>,
+    accounts: List<AccountBalance>,
+    onDismiss: () -> Unit,
+    onContribute: (accountId: Long, amount: Double) -> Unit,
+    onSave: (name: String, target: Double, icon: String, color: Long) -> Unit,
+    onDelete: () -> Unit
+) {
+    val goalColor = Color(goal.color)
+    var showEditDialog by remember { mutableStateOf(false) }
+    var showDepositSheet by remember { mutableStateOf(false) }
+    var showWithdrawSheet by remember { mutableStateOf(false) }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Top bar
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Назад")
+                    }
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        goal.name,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(onClick = { showEditDialog = true }) {
+                        Icon(Icons.Rounded.Edit, contentDescription = "Редактировать")
+                    }
+                }
+
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    // ─── Goal header ─────────────────────────────────
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        IconChip(iconKey = goal.iconKey, color = goalColor, size = 64.dp)
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            "${(goal.progress * 100).roundToInt()}%",
+                            style = MaterialTheme.typography.displaySmall,
+                            fontWeight = FontWeight.Bold,
+                            color = goalColor
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "выполнено",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    Spacer(Modifier.height(24.dp))
+                    GoalProgressBar(progress = goal.progress, color = goalColor)
+                    Spacer(Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text(
+                                "Накоплено",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                formatMoney(goal.savedAmount),
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = goalColor
+                            )
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                "Цель",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                formatMoney(goal.targetAmount),
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                        }
+                    }
+
+                    val remaining = (goal.targetAmount - goal.savedAmount).coerceAtLeast(0.0)
+                    if (remaining > 0.0) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Осталось: ${formatMoney(remaining)}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+
+                    // ─── Action buttons: deposit / withdraw ──────────
+                    Spacer(Modifier.height(24.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Button(
+                            onClick = { showDepositSheet = true },
+                            modifier = Modifier.weight(1f).height(50.dp),
+                            shape = MaterialTheme.shapes.large,
+                            colors = ButtonDefaults.buttonColors(containerColor = goalColor)
+                        ) {
+                            Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Пополнить", style = MaterialTheme.typography.titleMedium)
+                        }
+                        OutlinedButton(
+                            onClick = { showWithdrawSheet = true },
+                            modifier = Modifier.weight(1f).height(50.dp),
+                            shape = MaterialTheme.shapes.large,
+                            enabled = goal.savedAmount > 0.0
+                        ) {
+                            Icon(Icons.Rounded.Remove, contentDescription = null, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Снять", style = MaterialTheme.typography.titleMedium)
+                        }
+                    }
+
+                    // ─── Contributing accounts ───────────────────────
+                    if (sources.isNotEmpty()) {
+                        Spacer(Modifier.height(28.dp))
+                        Text(
+                            "Откуда вложено",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            sources.forEach { summary ->
+                                SourceAccountRow(
+                                    accountName = summary.account.name,
+                                    accountIconKey = summary.account.iconKey,
+                                    accountColor = Color(summary.account.color),
+                                    amount = summary.netAmount
+                                )
+                            }
+                        }
+                    }
+
+                    // ─── Delete ──────────────────────────────────────
+                    Spacer(Modifier.height(32.dp))
+                    TextButton(
+                        onClick = onDelete,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Удалить цель", color = MaterialTheme.colorScheme.error)
+                    }
+                    Spacer(Modifier.height(24.dp))
+                }
+            }
+        }
+    }
+
+    // ─── Edit dialog (name, target, icon, color) ─────────────────────────
+    if (showEditDialog) {
+        GoalEditorDialog(
+            initial = goal,
+            onDismiss = { showEditDialog = false },
+            onConfirm = { name, target, icon, color ->
+                onSave(name, target, icon, color)
+                showEditDialog = false
+            },
+            onDelete = null // delete is on the detail screen itself
+        )
+    }
+
+    // ─── Deposit dialog ──────────────────────────────────────────────────
+    if (showDepositSheet) {
+        ContributeDialog(
+            title = "Пополнить «${goal.name}»",
+            goal = goal,
+            accounts = accounts,
+            confirmLabel = "Пополнить",
+            isWithdraw = false,
+            onDismiss = { showDepositSheet = false },
+            onConfirm = { accountId, amount ->
+                onContribute(accountId, amount)
+                showDepositSheet = false
+            }
+        )
+    }
+
+    // ─── Withdraw dialog ─────────────────────────────────────────────────
+    if (showWithdrawSheet) {
+        ContributeDialog(
+            title = "Снять из «${goal.name}»",
+            goal = goal,
+            accounts = accounts,
+            confirmLabel = "Снять",
+            isWithdraw = true,
+            onDismiss = { showWithdrawSheet = false },
+            onConfirm = { accountId, amount ->
+                onContribute(accountId, -amount) // negative = withdraw
+                showWithdrawSheet = false
+            }
+        )
+    }
+}
+
+// ─── Goal Editor Dialog (name / target / icon / color) ───────────────────────
 
 @Composable
 private fun GoalEditorDialog(
@@ -256,14 +514,20 @@ private fun GoalEditorDialog(
     onDelete: (() -> Unit)?
 ) {
     var name by remember { mutableStateOf(initial?.name ?: "") }
-    var target by remember { mutableStateOf(initial?.targetAmount?.let { if (it % 1.0 == 0.0) it.toLong().toString() else it.toString() } ?: "") }
+    var target by remember {
+        mutableStateOf(
+            initial?.targetAmount?.let {
+                if (it % 1.0 == 0.0) it.toLong().toString() else it.toString()
+            } ?: ""
+        )
+    }
     var icon by remember { mutableStateOf(initial?.iconKey ?: "target") }
     var color by remember { mutableStateOf(initial?.color ?: finoraPalette[1]) }
     val iconKeys = listOf("target", "savings", "home", "car", "flight", "school", "phone", "gift", "games")
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (initial == null) "Новая цель" else "Цель") },
+        title = { Text(if (initial == null) "Новая цель" else "Редактировать цель") },
         text = {
             Column {
                 OutlinedTextField(
@@ -312,31 +576,43 @@ private fun GoalEditorDialog(
     )
 }
 
-// ─── Contribute Dialog ───────────────────────────────────────────────────────
+// ─── Contribute / Withdraw Dialog ────────────────────────────────────────────
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ContributeDialog(
+    title: String,
     goal: Goal,
     accounts: List<AccountBalance>,
+    confirmLabel: String,
+    isWithdraw: Boolean,
     onDismiss: () -> Unit,
-    onConfirm: (accountId: Long, delta: Double) -> Unit
+    onConfirm: (accountId: Long, amount: Double) -> Unit
 ) {
     var amount by remember { mutableStateOf("") }
     var selectedAccountId by remember(accounts) { mutableStateOf(accounts.firstOrNull()?.account?.id) }
     val parsed = amount.replace(',', '.').toDoubleOrNull() ?: 0.0
-    val ready = parsed > 0.0 && selectedAccountId != null
+    val maxWithdraw = if (isWithdraw) goal.savedAmount else Double.MAX_VALUE
+    val ready = parsed > 0.0 && parsed <= maxWithdraw && selectedAccountId != null
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Пополнить «${goal.name}»") },
+        title = { Text(title) },
         text = {
             Column {
-                Text(
-                    "Накоплено ${formatMoney(goal.savedAmount)} из ${formatMoney(goal.targetAmount)}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                if (isWithdraw) {
+                    Text(
+                        "Доступно для снятия: ${formatMoney(goal.savedAmount)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    Text(
+                        "Накоплено ${formatMoney(goal.savedAmount)} из ${formatMoney(goal.targetAmount)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 Spacer(Modifier.height(12.dp))
                 MoneyTextField(
                     value = amount,
@@ -353,7 +629,7 @@ private fun ContributeDialog(
                     )
                 } else {
                     Text(
-                        "Со счёта",
+                        if (isWithdraw) "На счёт" else "Со счёта",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -379,16 +655,10 @@ private fun ContributeDialog(
             TextButton(
                 onClick = { selectedAccountId?.let { onConfirm(it, parsed) } },
                 enabled = ready
-            ) { Text("Пополнить") }
+            ) { Text(confirmLabel) }
         },
         dismissButton = {
-            Row {
-                TextButton(
-                    onClick = { selectedAccountId?.let { onConfirm(it, -parsed) } },
-                    enabled = ready
-                ) { Text("Снять") }
-                TextButton(onClick = onDismiss) { Text("Отмена") }
-            }
+            TextButton(onClick = onDismiss) { Text("Отмена") }
         }
     )
 }

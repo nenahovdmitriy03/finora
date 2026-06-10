@@ -53,7 +53,7 @@ fun FinoraNavHost(navController: NavHostController = rememberNavController()) {
 
     // Observe auth state to handle navigation between auth and main screens
     val sessionStatus by SupabaseModule.client.auth.sessionStatus
-        .collectAsStateWithLifecycle(initialValue = SessionStatus.LoadingFromStorage)
+        .collectAsStateWithLifecycle(initialValue = null)
 
     // Navigate based on auth state changes
     LaunchedEffect(sessionStatus) {
@@ -108,8 +108,10 @@ fun FinoraNavHost(navController: NavHostController = rememberNavController()) {
         }
     ) { innerPadding ->
         // Start destination depends on whether we have a session
-        val startDest = if (sessionStatus is SessionStatus.Authenticated)
-            Destination.Home.route else Destination.Auth.route
+        val startDest = when (sessionStatus) {
+            is SessionStatus.Authenticated -> Destination.Home.route
+            else -> Destination.Auth.route
+        }
 
         NavHost(
             navController = navController,

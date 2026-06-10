@@ -32,10 +32,10 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.finora.presentation.accounts.AccountsScreen
 import com.finora.presentation.addtransaction.AddTransactionScreen
+import com.finora.presentation.ai.AiChatScreen
 import com.finora.presentation.goals.GoalsScreen
 import com.finora.presentation.home.HomeScreen
 import com.finora.presentation.settings.SettingsScreen
-import com.finora.presentation.statistics.StatisticsScreen
 import com.finora.presentation.transactions.TransactionsScreen
 
 @Composable
@@ -84,6 +84,7 @@ fun FinoraNavHost(navController: NavHostController = rememberNavController()) {
                     onSeeAllTransactions = { navController.navigate(Destination.Transactions.route) },
                     onSeeAccounts = { navController.navigate(Destination.Accounts.route) },
                     onSeeGoals = { navController.navigate(Destination.Goals.route) },
+                    onOpenAi = { navController.navigate(Destination.AiChat.route) },
                     onOpenTransaction = { id -> navController.navigate(Destination.AddTransaction.create(id)) }
                 )
             }
@@ -92,7 +93,9 @@ fun FinoraNavHost(navController: NavHostController = rememberNavController()) {
                     onOpenTransaction = { id -> navController.navigate(Destination.AddTransaction.create(id)) }
                 )
             }
-            composable(Destination.Statistics.route) { StatisticsScreen() }
+            composable(Destination.AiChat.route) {
+                AiChatScreen(onBack = { navController.popBackStack() })
+            }
             composable(Destination.Goals.route) { GoalsScreen() }
             composable(Destination.Settings.route) {
                 SettingsScreen(

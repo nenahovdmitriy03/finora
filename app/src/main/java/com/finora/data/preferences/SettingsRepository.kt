@@ -19,6 +19,7 @@ class SettingsRepository(context: Context) {
     private val appContext = context.applicationContext
     private val themeKey = stringPreferencesKey("theme_mode")
     private val accentKey = stringPreferencesKey("accent_color")
+    private val aiSessionKey = stringPreferencesKey("ai_chat_session")
 
     val themeMode: Flow<ThemeMode> = appContext.dataStore.data.map { prefs ->
         prefs[themeKey]?.let { stored -> runCatching { ThemeMode.valueOf(stored) }.getOrNull() }
@@ -36,5 +37,18 @@ class SettingsRepository(context: Context) {
 
     suspend fun setAccentColor(accent: AccentColor) {
         appContext.dataStore.edit { prefs -> prefs[accentKey] = accent.name }
+    }
+
+    /** Persisted AI chat session (JSON), so the conversation survives app restarts. */
+    val aiChatSession: Flow<String> = appContext.dataStore.data.map { prefs ->
+        prefs[aiSessionKey].orEmpty()
+    }
+
+    suspend fun setAiChatSession(json: String) {
+        appContext.dataStore.edit { prefs -> prefs[aiSessionKey] = json }
+    }
+
+    suspend fun clearAiChatSession() {
+        appContext.dataStore.edit { prefs -> prefs.remove(aiSessionKey) }
     }
 }

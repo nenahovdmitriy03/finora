@@ -22,7 +22,6 @@ import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.ReceiptLong
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -56,6 +55,7 @@ fun HomeScreen(
     onSeeAllTransactions: () -> Unit,
     onSeeAccounts: () -> Unit,
     onSeeGoals: () -> Unit,
+    onOpenAi: () -> Unit,
     onOpenTransaction: (Long) -> Unit,
     viewModel: HomeViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
@@ -68,7 +68,7 @@ fun HomeScreen(
     ) {
         item { Header() }
         item { BalanceHero(state) }
-        item { AiInsightCard() }
+        item { AiInsightCard(onOpenAi = onOpenAi) }
         item {
             SectionHeader(
                 title = "Счета",
@@ -228,10 +228,11 @@ private fun FlowStat(
 
 @Composable
 private fun AiInsightCard(
+    onOpenAi: () -> Unit,
     viewModel: AiInsightViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
     val ai by viewModel.state.collectAsStateWithLifecycle()
-    FinoraCard {
+    FinoraCard(modifier = Modifier.clickable(enabled = ai.configured) { onOpenAi() }) {
         Column {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
@@ -263,40 +264,24 @@ private fun AiInsightCard(
                         )
                     }
                 }
-                if (ai.loading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(22.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                } else if (ai.configured) {
-                    TextButton(onClick = { viewModel.analyze() }) {
-                        Text(if (ai.insight == null) "Анализировать" else "Обновить")
-                    }
+                if (ai.configured) {
+                    TextButton(onClick = onOpenAi) { Text("Анализировать") }
                 }
             }
             Spacer(Modifier.height(6.dp))
-            when {
-                !ai.configured -> Text(
-                    text = "Чтобы включить ИИ-анализ, добавь в local.properties ключ одного из провайдеров и пересобери:\n" +
-                        "• OPENROUTER_API_KEY (openrouter.ai — много бесплатных моделей)\n" +
-                        "• GROQ_API_KEY (console.groq.com — быстро и бесплатно)\n" +
-                        "• GEMINI_API_KEY (Google AI Studio)",
+            if (ai.configured) {
+                Text(
+                    text = "Открой умного помощника — он разберёт твои доходы, расходы, счета и цели, " +
+                        "подскажет, что улучшить, и ответит на твои вопросы.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                ai.error != null -> Text(
-                    text = "Ошибка: ${ai.error}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error
-                )
-                ai.insight != null -> Text(
-                    text = ai.insight!!,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                else -> Text(
-                    text = "Нажми «Анализировать» — ИИ посмотрит твои доходы, расходы, счета и цели и подскажет, что улучшить.",
+            } else {
+                Text(
+                    text = "Чтобы включить ИИ, добавь в local.properties ключ одного из провайдеров и пересобери:\n" +
+                        "• OPENROUTER_API_KEY (openrouter.ai — много бесплатных моделей)\n" +
+                        "• GROQ_API_KEY (console.groq.com — быстро и бесплатно)\n" +
+                        "• GEMINI_API_KEY (Google AI Studio)",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

@@ -2,12 +2,35 @@ package com.finora.data.ai
 
 import com.finora.BuildConfig
 
+/** One turn in a conversation. [role] is "system", "user" or "assistant". */
+data class ChatTurn(val role: String, val content: String)
+
 /** A text-generation backend (Gemini, OpenRouter, Groq, …). */
 interface AiEngine {
     /** Human-readable provider name shown in the UI. */
     val label: String
     val isConfigured: Boolean
+
+    /** Single-shot completion. */
     suspend fun generate(prompt: String): String
+
+    /**
+     * Multi-turn chat. Default flattens the conversation into one prompt and
+     * delegates to [generate]; providers that support native chat (OpenAI-compatible)
+     * override this for better quality.
+     */
+    suspend fun chat(messages: List<ChatTurn>): String {
+        val sb = StringBuilder()
+        messages.forEach { turn ->
+            when (turn.role) {
+                "system" -> sb.appendLine(turn.content).appendLine()
+                "user" -> sb.appendLine("Пользователь: ${turn.content}")
+                else -> sb.appendLine("Ассистент: ${turn.content}")
+            }
+        }
+        sb.append("Ассистент:")
+        return generate(sb.toString())
+    }
 }
 
 /**

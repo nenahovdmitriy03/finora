@@ -26,11 +26,19 @@ class OpenAiCompatClient(
 
     override val isConfigured: Boolean get() = apiKey.isNotBlank()
 
-    override suspend fun generate(prompt: String): String {
+    override suspend fun generate(prompt: String): String =
+        chat(listOf(ChatTurn("user", prompt)))
+
+    override suspend fun chat(messages: List<ChatTurn>): String {
+        val payloadMessages = JSONArray().apply {
+            messages.forEach { turn ->
+                put(JSONObject().put("role", turn.role).put("content", turn.content))
+            }
+        }
         var lastError: Exception? = null
         for (model in models) {
             try {
-                return requestOnce(prompt, model)
+                return requestOnce(payloadMessages, model)
             } catch (e: Exception) {
                 lastError = e
                 // Only fall through to the next model on transient/limit errors.
@@ -43,44 +51,40 @@ class OpenAiCompatClient(
         throw lastError ?: IOException("Не удалось получить ответ")
     }
 
-    private suspend fun requestOnce(prompt: String, model: String): String = withContext(Dispatchers.IO) {
-        val url = URL("${baseUrl.trimEnd('/')}/chat/completions")
-        val conn = (url.openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            connectTimeout = 30_000
-            readTimeout = 60_000
-            doOutput = true
-            setRequestProperty("Authorization", "Bearer $apiKey")
-            setRequestProperty("Content-Type", "application/json")
-            // Optional but recommended by OpenRouter for attribution.
-            setRequestProperty("HTTP-Referer", "https://github.com/nenahovdmitriy03/finora")
-            setRequestProperty("X-Title", "Finora")
-        }
-
-        val payload = JSONObject().apply {
-            put("model", model)
-            put("temperature", 0.7)
-            put(
-                "messages",
-                JSONArray().put(
-                    JSONObject().put("role", "user").put("content", prompt)
-                )
-            )
-        }
-
-        try {
-            conn.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
-            val code = conn.responseCode
-            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-            val text = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-            if (code !in 200..299) {
-                throw IOException("HTTP $code: ${extractError(text)}")
+    private suspend fun requestOnce(messages: JSONArray, model: String): String =
+        withContext(Dispatchers.IO) {
+            val url = URL("${baseUrl.trimEnd('/')}/chat/completions")
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                connectTimeout = 30_000
+                readTimeout = 60_000
+                doOutput = true
+                setRequestProperty("Authorization", "Bearer $apiKey")
+                setRequestProperty("Content-Type", "application/json")
+                // Optional but recommended by OpenRouter for attribution.
+                setRequestProperty("HTTP-Referer", "https://github.com/nenahovdmitriy03/finora")
+                setRequestProperty("X-Title", "Finora")
             }
-            parseContent(text)
-        } finally {
-            conn.disconnect()
+
+            val payload = JSONObject().apply {
+                put("model", model)
+                put("temperature", 0.7)
+                put("messages", messages)
+            }
+
+            try {
+                conn.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
+                val code = conn.responseCode
+                val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+                val text = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+                if (code !in 200..299) {
+                    throw IOException("HTTP $code: ${extractError(text)}")
+                }
+                parseContent(text)
+            } finally {
+                conn.disconnect()
+            }
         }
-    }
 
     private fun parseContent(body: String): String {
         val json = JSONObject(body)

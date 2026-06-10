@@ -9,6 +9,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 
 sealed class Destination(val route: String) {
     data object Auth : Destination("auth")
+    data object Onboarding : Destination("onboarding")
     data object Home : Destination("home")
     data object Transactions : Destination("transactions")
     data object Goals : Destination("goals")

@@ -3,6 +3,7 @@ package com.finora.data.preferences
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -20,6 +21,11 @@ class SettingsRepository(context: Context) {
     private val themeKey = stringPreferencesKey("theme_mode")
     private val accentKey = stringPreferencesKey("accent_color")
     private val aiSessionKey = stringPreferencesKey("ai_chat_session")
+
+    // ─── Onboarding / guide flags ────────────────────────────────────────
+    private val authSkippedKey = booleanPreferencesKey("auth_skipped")
+    private val onboardingCompletedKey = booleanPreferencesKey("onboarding_completed")
+    private val guideCompletedKey = booleanPreferencesKey("guide_completed")
 
     val themeMode: Flow<ThemeMode> = appContext.dataStore.data.map { prefs ->
         prefs[themeKey]?.let { stored -> runCatching { ThemeMode.valueOf(stored) }.getOrNull() }
@@ -50,5 +56,40 @@ class SettingsRepository(context: Context) {
 
     suspend fun clearAiChatSession() {
         appContext.dataStore.edit { prefs -> prefs.remove(aiSessionKey) }
+    }
+
+    // ─── Auth-skip / onboarding / guide ──────────────────────────────────
+
+    val authSkipped: Flow<Boolean> = appContext.dataStore.data.map { prefs ->
+        prefs[authSkippedKey] == true
+    }
+
+    suspend fun setAuthSkipped(value: Boolean) {
+        appContext.dataStore.edit { prefs -> prefs[authSkippedKey] = value }
+    }
+
+    val onboardingCompleted: Flow<Boolean> = appContext.dataStore.data.map { prefs ->
+        prefs[onboardingCompletedKey] == true
+    }
+
+    suspend fun setOnboardingCompleted(value: Boolean) {
+        appContext.dataStore.edit { prefs -> prefs[onboardingCompletedKey] = value }
+    }
+
+    val guideCompleted: Flow<Boolean> = appContext.dataStore.data.map { prefs ->
+        prefs[guideCompletedKey] == true
+    }
+
+    suspend fun setGuideCompleted(value: Boolean) {
+        appContext.dataStore.edit { prefs -> prefs[guideCompletedKey] = value }
+    }
+
+    /** Reset onboarding flags (used on account deletion). */
+    suspend fun clearOnboardingFlags() {
+        appContext.dataStore.edit { prefs ->
+            prefs.remove(authSkippedKey)
+            prefs.remove(onboardingCompletedKey)
+            prefs.remove(guideCompletedKey)
+        }
     }
 }

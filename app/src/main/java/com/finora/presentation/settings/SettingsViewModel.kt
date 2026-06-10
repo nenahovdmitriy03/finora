@@ -29,15 +29,15 @@ class SettingsViewModel(
     val authState: StateFlow<AuthRepository.AuthState> = authRepo.authState
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AuthRepository.AuthState.Loading)
 
-    private val _syncStatus = MutableStateFlow<SyncStatus>(SyncStatus.Idle)
-    val syncStatus: StateFlow<SyncStatus> = _syncStatus.asStateFlow()
-
-    sealed interface SyncStatus {
-        data object Idle : SyncStatus
-        data object Syncing : SyncStatus
-        data object Success : SyncStatus
-        data class Error(val message: String) : SyncStatus
+    sealed interface DeleteStatus {
+        data object Idle : DeleteStatus
+        data object Deleting : DeleteStatus
+        data object Done : DeleteStatus
+        data class Error(val message: String) : DeleteStatus
     }
+
+    private val _deleteStatus = MutableStateFlow<DeleteStatus>(DeleteStatus.Idle)
+    val deleteStatus: StateFlow<DeleteStatus> = _deleteStatus.asStateFlow()
 
     fun setTheme(mode: ThemeMode) {
         viewModelScope.launch { settings.setThemeMode(mode) }
@@ -48,33 +48,29 @@ class SettingsViewModel(
     }
 
     fun signOut() {
-        viewModelScope.launch { authRepo.signOut() }
-    }
-
-    /** Upload local data to cloud. */
-    fun syncToCloud() {
-        val userId = authRepo.currentUserId() ?: return
-        _syncStatus.value = SyncStatus.Syncing
         viewModelScope.launch {
+            // Auto-upload before signing out
             try {
-                syncManager.uploadAll(userId)
-                _syncStatus.value = SyncStatus.Success
-            } catch (e: Exception) {
-                _syncStatus.value = SyncStatus.Error(e.message ?: "Ошибка синхронизации")
-            }
+                val userId = authRepo.currentUserId()
+                if (userId != null) syncManager.uploadAll(userId)
+            } catch (_: Exception) { }
+            authRepo.signOut()
+            settings.clearOnboardingFlags()
         }
     }
 
-    /** Restore data from cloud (overwrite local). */
-    fun restoreFromCloud() {
+    /** Delete all user data from cloud + local, then sign out. */
+    fun deleteAccount() {
         val userId = authRepo.currentUserId() ?: return
-        _syncStatus.value = SyncStatus.Syncing
+        _deleteStatus.value = DeleteStatus.Deleting
         viewModelScope.launch {
             try {
-                syncManager.downloadAll(userId)
-                _syncStatus.value = SyncStatus.Success
+                syncManager.deleteAllUserData(userId)
+                authRepo.signOut()
+                settings.clearOnboardingFlags()
+                _deleteStatus.value = DeleteStatus.Done
             } catch (e: Exception) {
-                _syncStatus.value = SyncStatus.Error(e.message ?: "Ошибка восстановления")
+                _deleteStatus.value = DeleteStatus.Error(e.message ?: "Ошибка удаления")
             }
         }
     }

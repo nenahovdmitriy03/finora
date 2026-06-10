@@ -306,4 +306,22 @@ class SyncManager(
             db.transferDao().upsert(entity)
         }
     }
+
+    // ─── Delete all user data ────────────────────────────────────────────
+
+    /**
+     * Removes all remote data for [userId] and clears local Room tables.
+     */
+    suspend fun deleteAllUserData(userId: String) = withContext(Dispatchers.IO) {
+        val pg = client.postgrest
+        // Delete remote (reverse FK order)
+        pg.from("goal_contributions").delete { filter { eq("user_id", userId) } }
+        pg.from("transfers").delete { filter { eq("user_id", userId) } }
+        pg.from("transactions").delete { filter { eq("user_id", userId) } }
+        pg.from("goals").delete { filter { eq("user_id", userId) } }
+        pg.from("categories").delete { filter { eq("user_id", userId) } }
+        pg.from("accounts").delete { filter { eq("user_id", userId) } }
+        // Clear local
+        db.clearAllTables()
+    }
 }

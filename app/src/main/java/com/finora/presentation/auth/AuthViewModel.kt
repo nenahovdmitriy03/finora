@@ -2,6 +2,7 @@ package com.finora.presentation.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.finora.data.preferences.SettingsRepository
 import com.finora.data.remote.AuthRepository
 import com.finora.data.remote.SyncManager
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,12 +17,14 @@ data class AuthUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val info: String? = null,
-    val success: Boolean = false
+    val success: Boolean = false,
+    val skipped: Boolean = false
 )
 
 class AuthViewModel(
     private val authRepo: AuthRepository,
-    private val syncManager: SyncManager
+    private val syncManager: SyncManager,
+    private val settings: SettingsRepository
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(AuthUiState())
@@ -39,6 +42,14 @@ class AuthViewModel(
         _state.value = _state.value.copy(isLogin = !_state.value.isLogin, error = null, info = null)
     }
 
+    /** Skip authentication — use app locally without an account. */
+    fun skipAuth() {
+        viewModelScope.launch {
+            settings.setAuthSkipped(true)
+            _state.value = _state.value.copy(skipped = true)
+        }
+    }
+
     fun submit() {
         val s = _state.value
         if (s.email.isBlank() || s.password.length < 6) {
@@ -51,7 +62,6 @@ class AuthViewModel(
             try {
                 if (s.isLogin) {
                     authRepo.signIn(s.email, s.password)
-                    // After login — try to restore data from cloud
                     val userId = authRepo.currentUserId()
                     if (userId != null) {
                         try { syncManager.downloadAll(userId) } catch (_: Exception) { }
@@ -59,14 +69,11 @@ class AuthViewModel(
                     _state.value = _state.value.copy(isLoading = false, success = true)
                 } else {
                     authRepo.signUp(s.email, s.password)
-                    // Check if user got auto-confirmed (email confirmation disabled)
                     val userId = authRepo.currentUserId()
                     if (userId != null) {
-                        // Auto-confirmed — upload data and proceed
                         try { syncManager.uploadAll(userId) } catch (_: Exception) { }
                         _state.value = _state.value.copy(isLoading = false, success = true)
                     } else {
-                        // Email confirmation required — tell user to check inbox
                         _state.value = _state.value.copy(
                             isLoading = false,
                             info = "Письмо для подтверждения отправлено на ${s.email}. Проверьте почту и перейдите по ссылке, затем нажмите «Войти»."

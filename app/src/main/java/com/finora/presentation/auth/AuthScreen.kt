@@ -10,6 +10,7 @@ import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,11 +31,18 @@ import com.finora.presentation.AppViewModelProvider
 
 @Composable
 fun AuthScreen(
+    onSkipped: () -> Unit = {},
     viewModel: AuthViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
     var passwordVisible by remember { mutableStateOf(false) }
+    var showSkipWarning by remember { mutableStateOf(false) }
+
+    // React to skip
+    LaunchedEffect(state.skipped) {
+        if (state.skipped) onSkipped()
+    }
 
     Box(
         modifier = Modifier
@@ -162,7 +170,7 @@ fun AuthScreen(
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(12.dp))
 
             // Toggle login/register
             TextButton(onClick = viewModel::toggleMode) {
@@ -173,6 +181,86 @@ fun AuthScreen(
                     color = MaterialTheme.colorScheme.primary
                 )
             }
+
+            Spacer(Modifier.height(8.dp))
+
+            // Divider
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                HorizontalDivider(modifier = Modifier.weight(1f))
+                Text(
+                    "или",
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                HorizontalDivider(modifier = Modifier.weight(1f))
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            // Skip auth — continue without account
+            OutlinedButton(
+                onClick = { showSkipWarning = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape = MaterialTheme.shapes.medium
+            ) {
+                Text(
+                    "Продолжить без аккаунта",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
+    }
+
+    // Skip warning dialog
+    if (showSkipWarning) {
+        AlertDialog(
+            onDismissRequest = { showSkipWarning = false },
+            icon = {
+                Icon(
+                    Icons.Rounded.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    "Данные только на устройстве",
+                    style = MaterialTheme.typography.titleLarge,
+                    textAlign = TextAlign.Center
+                )
+            },
+            text = {
+                Text(
+                    "Без аккаунта ваши данные хранятся только локально. " +
+                    "При удалении приложения или смене устройства они будут потеряны.\n\n" +
+                    "Вы всегда сможете создать аккаунт позже в настройках.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showSkipWarning = false
+                        viewModel.skipAuth()
+                    }
+                ) {
+                    Text("Понятно, продолжить")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSkipWarning = false }) {
+                    Text("Отмена")
+                }
+            }
+        )
     }
 }

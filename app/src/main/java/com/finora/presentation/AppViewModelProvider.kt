@@ -42,7 +42,8 @@ object AppViewModelProvider {
         initializer {
             AuthViewModel(
                 creationApp(this).container.authRepository,
-                creationApp(this).container.syncManager
+                creationApp(this).container.syncManager,
+                creationApp(this).container.settings
             )
         }
     }

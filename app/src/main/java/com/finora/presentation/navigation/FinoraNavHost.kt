@@ -5,6 +5,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
@@ -17,10 +19,14 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -32,135 +38,218 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.finora.data.remote.AuthRepository
+import com.finora.FinoraApp
 import com.finora.data.remote.SupabaseModule
-import io.github.jan.supabase.auth.auth
-import io.github.jan.supabase.auth.status.SessionStatus
-import kotlinx.coroutines.flow.map
 import com.finora.presentation.accounts.AccountsScreen
 import com.finora.presentation.addtransaction.AddTransactionScreen
 import com.finora.presentation.ai.AiChatScreen
 import com.finora.presentation.auth.AuthScreen
 import com.finora.presentation.goals.GoalsScreen
+import com.finora.presentation.guide.GuideController
+import com.finora.presentation.guide.GuideOverlay
+import com.finora.presentation.guide.GuideStep
+import com.finora.presentation.guide.LocalGuideController
+import com.finora.presentation.guide.guideTarget
 import com.finora.presentation.home.HomeScreen
+import com.finora.presentation.onboarding.OnboardingScreen
 import com.finora.presentation.settings.SettingsScreen
 import com.finora.presentation.transactions.TransactionsScreen
+import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.auth.status.SessionStatus
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 @Composable
 fun FinoraNavHost(navController: NavHostController = rememberNavController()) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+    val context = LocalContext.current
+    val app = context.applicationContext as FinoraApp
+    val settingsRepo = app.container.settings
+    val scope = rememberCoroutineScope()
 
-    // Observe auth state to handle navigation between auth and main screens
+    // ─── Observe auth + preference states ────────────────────────────────
     val sessionStatus by SupabaseModule.client.auth.sessionStatus
         .collectAsStateWithLifecycle(initialValue = null)
+    val authSkipped by settingsRepo.authSkipped
+        .collectAsStateWithLifecycle(initialValue = false)
+    val onboardingCompleted by settingsRepo.onboardingCompleted
+        .collectAsStateWithLifecycle(initialValue = true) // default true to avoid flash
+    val guideCompleted by settingsRepo.guideCompleted
+        .collectAsStateWithLifecycle(initialValue = true)
 
-    // Navigate based on auth state changes
-    LaunchedEffect(sessionStatus) {
-        when (sessionStatus) {
-            is SessionStatus.Authenticated -> {
+    // Guide controller — shared via CompositionLocal
+    val guideController = remember { GuideController() }
+
+    // ─── Navigation logic ────────────────────────────────────────────────
+    val isAuthenticated = sessionStatus is SessionStatus.Authenticated
+    val canAccessApp = isAuthenticated || authSkipped
+
+    LaunchedEffect(sessionStatus, authSkipped, onboardingCompleted) {
+        when {
+            // Authenticated or skipped → go to onboarding or home
+            canAccessApp -> {
                 if (currentRoute == Destination.Auth.route) {
-                    navController.navigate(Destination.Home.route) {
+                    val next = if (!onboardingCompleted) Destination.Onboarding.route
+                                else Destination.Home.route
+                    navController.navigate(next) {
                         popUpTo(Destination.Auth.route) { inclusive = true }
                     }
                 }
             }
-            is SessionStatus.NotAuthenticated -> {
+            // Not authenticated and not skipped → must auth
+            sessionStatus is SessionStatus.NotAuthenticated -> {
                 if (currentRoute != Destination.Auth.route) {
                     navController.navigate(Destination.Auth.route) {
                         popUpTo(0) { inclusive = true }
                     }
                 }
             }
-            else -> {} // Loading — do nothing
+        }
+    }
+
+    // Auto-sync on start (once) when authenticated
+    LaunchedEffect(isAuthenticated) {
+        if (isAuthenticated) {
+            launch(Dispatchers.IO) {
+                try {
+                    val userId = app.container.authRepository.currentUserId()
+                    if (userId != null) app.container.syncManager.uploadAll(userId)
+                } catch (_: Exception) { }
+            }
+        }
+    }
+
+    // Start guide after onboarding is done and guide hasn't been shown
+    LaunchedEffect(onboardingCompleted, guideCompleted) {
+        if (onboardingCompleted && !guideCompleted && canAccessApp) {
+            guideController.start()
         }
     }
 
     val showBars = currentRoute in bottomItems.map { it.destination.route }
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        bottomBar = {
-            AnimatedVisibility(
-                visible = showBars,
-                enter = slideInVertically { it } + fadeIn(),
-                exit = slideOutVertically { it } + fadeOut()
-            ) {
-                FinoraBottomBar(navController, backStackEntry?.destination)
-            }
-        },
-        floatingActionButton = {
-            val onTransactionTabs = currentRoute == Destination.Home.route ||
-                currentRoute == Destination.Transactions.route
-            AnimatedVisibility(
-                visible = onTransactionTabs,
-                enter = fadeIn(),
-                exit = fadeOut()
-            ) {
-                FloatingActionButton(
-                    onClick = { navController.navigate(Destination.AddTransaction.create()) },
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = Color.White
+    CompositionLocalProvider(LocalGuideController provides guideController) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Scaffold(
+                containerColor = MaterialTheme.colorScheme.background,
+                bottomBar = {
+                    AnimatedVisibility(
+                        visible = showBars,
+                        enter = slideInVertically { it } + fadeIn(),
+                        exit = slideOutVertically { it } + fadeOut()
+                    ) {
+                        FinoraBottomBar(
+                            navController = navController,
+                            currentDestination = backStackEntry?.destination,
+                            guideController = guideController
+                        )
+                    }
+                },
+                floatingActionButton = {
+                    val onTransactionTabs = currentRoute == Destination.Home.route ||
+                        currentRoute == Destination.Transactions.route
+                    AnimatedVisibility(
+                        visible = onTransactionTabs,
+                        enter = fadeIn(),
+                        exit = fadeOut()
+                    ) {
+                        FloatingActionButton(
+                            onClick = { navController.navigate(Destination.AddTransaction.create()) },
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = Color.White,
+                            modifier = Modifier.guideTarget(guideController, GuideStep.FAB)
+                        ) {
+                            Icon(Icons.Rounded.Add, contentDescription = "Добавить операцию")
+                        }
+                    }
+                }
+            ) { innerPadding ->
+                val startDest = when {
+                    canAccessApp && onboardingCompleted -> Destination.Home.route
+                    canAccessApp -> Destination.Onboarding.route
+                    else -> Destination.Auth.route
+                }
+
+                NavHost(
+                    navController = navController,
+                    startDestination = startDest,
+                    modifier = Modifier.padding(innerPadding)
                 ) {
-                    Icon(Icons.Rounded.Add, contentDescription = "Добавить операцию")
+                    composable(Destination.Auth.route) {
+                        AuthScreen(
+                            onSkipped = {
+                                val next = Destination.Onboarding.route
+                                navController.navigate(next) {
+                                    popUpTo(Destination.Auth.route) { inclusive = true }
+                                }
+                            }
+                        )
+                    }
+                    composable(Destination.Onboarding.route) {
+                        OnboardingScreen(
+                            onFinish = {
+                                scope.launch {
+                                    settingsRepo.setOnboardingCompleted(true)
+                                }
+                                navController.navigate(Destination.Home.route) {
+                                    popUpTo(Destination.Onboarding.route) { inclusive = true }
+                                }
+                            }
+                        )
+                    }
+                    composable(Destination.Home.route) {
+                        HomeScreen(
+                            onAddTransaction = { navController.navigate(Destination.AddTransaction.create()) },
+                            onSeeAllTransactions = { navController.navigate(Destination.Transactions.route) },
+                            onSeeAccounts = { navController.navigate(Destination.Accounts.route) },
+                            onSeeGoals = { navController.navigate(Destination.Goals.route) },
+                            onOpenAi = { navController.navigate(Destination.AiChat.route) },
+                            onOpenTransaction = { id -> navController.navigate(Destination.AddTransaction.create(id)) }
+                        )
+                    }
+                    composable(Destination.Transactions.route) {
+                        TransactionsScreen(
+                            onOpenTransaction = { id -> navController.navigate(Destination.AddTransaction.create(id)) }
+                        )
+                    }
+                    composable(Destination.AiChat.route) {
+                        AiChatScreen(onBack = { navController.popBackStack() })
+                    }
+                    composable(Destination.Goals.route) { GoalsScreen() }
+                    composable(Destination.Settings.route) {
+                        SettingsScreen(
+                            onOpenAccounts = { navController.navigate(Destination.Accounts.route) }
+                        )
+                    }
+                    composable(Destination.Accounts.route) {
+                        AccountsScreen(onBack = { navController.popBackStack() })
+                    }
+                    composable(
+                        route = Destination.AddTransaction.route,
+                        arguments = listOf(
+                            navArgument(Destination.AddTransaction.ARG_ID) {
+                                type = NavType.LongType
+                                defaultValue = -1L
+                            }
+                        )
+                    ) { entry ->
+                        val id = entry.arguments?.getLong(Destination.AddTransaction.ARG_ID) ?: -1L
+                        AddTransactionScreen(
+                            transactionId = id,
+                            onDone = { navController.popBackStack() }
+                        )
+                    }
                 }
             }
-        }
-    ) { innerPadding ->
-        // Start destination depends on whether we have a session
-        val startDest = when (sessionStatus) {
-            is SessionStatus.Authenticated -> Destination.Home.route
-            else -> Destination.Auth.route
-        }
 
-        NavHost(
-            navController = navController,
-            startDestination = startDest,
-            modifier = Modifier.padding(innerPadding)
-        ) {
-            composable(Destination.Auth.route) {
-                AuthScreen()
-            }
-            composable(Destination.Home.route) {
-                HomeScreen(
-                    onAddTransaction = { navController.navigate(Destination.AddTransaction.create()) },
-                    onSeeAllTransactions = { navController.navigate(Destination.Transactions.route) },
-                    onSeeAccounts = { navController.navigate(Destination.Accounts.route) },
-                    onSeeGoals = { navController.navigate(Destination.Goals.route) },
-                    onOpenAi = { navController.navigate(Destination.AiChat.route) },
-                    onOpenTransaction = { id -> navController.navigate(Destination.AddTransaction.create(id)) }
-                )
-            }
-            composable(Destination.Transactions.route) {
-                TransactionsScreen(
-                    onOpenTransaction = { id -> navController.navigate(Destination.AddTransaction.create(id)) }
-                )
-            }
-            composable(Destination.AiChat.route) {
-                AiChatScreen(onBack = { navController.popBackStack() })
-            }
-            composable(Destination.Goals.route) { GoalsScreen() }
-            composable(Destination.Settings.route) {
-                SettingsScreen(
-                    onOpenAccounts = { navController.navigate(Destination.Accounts.route) }
-                )
-            }
-            composable(Destination.Accounts.route) {
-                AccountsScreen(onBack = { navController.popBackStack() })
-            }
-            composable(
-                route = Destination.AddTransaction.route,
-                arguments = listOf(
-                    navArgument(Destination.AddTransaction.ARG_ID) {
-                        type = NavType.LongType
-                        defaultValue = -1L
+            // ─── Guide overlay (above Scaffold) ──────────────────────────
+            if (guideController.isActive && currentRoute == Destination.Home.route) {
+                GuideOverlay(
+                    controller = guideController,
+                    onFinish = {
+                        scope.launch { settingsRepo.setGuideCompleted(true) }
                     }
-                )
-            ) { entry ->
-                val id = entry.arguments?.getLong(Destination.AddTransaction.ARG_ID) ?: -1L
-                AddTransactionScreen(
-                    transactionId = id,
-                    onDone = { navController.popBackStack() }
                 )
             }
         }
@@ -170,16 +259,26 @@ fun FinoraNavHost(navController: NavHostController = rememberNavController()) {
 @Composable
 private fun FinoraBottomBar(
     navController: NavHostController,
-    currentDestination: androidx.navigation.NavDestination?
+    currentDestination: androidx.navigation.NavDestination?,
+    guideController: GuideController
 ) {
     NavigationBar(
         containerColor = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp
     ) {
-        bottomItems.forEach { item ->
+        bottomItems.forEachIndexed { index, item ->
             val selected = currentDestination?.hierarchy?.any {
                 it.route == item.destination.route
             } == true
+
+            // Map bottom nav index to guide step
+            val guideStep = when (index) {
+                1 -> GuideStep.NAV_TRANSACTIONS
+                2 -> GuideStep.NAV_GOALS
+                3 -> GuideStep.NAV_SETTINGS
+                else -> -1
+            }
+
             NavigationBarItem(
                 selected = selected,
                 onClick = {
@@ -193,6 +292,8 @@ private fun FinoraBottomBar(
                 },
                 icon = { Icon(item.icon, contentDescription = item.label) },
                 label = { Text(item.label, style = MaterialTheme.typography.labelMedium) },
+                modifier = if (guideStep >= 0) Modifier.guideTarget(guideController, guideStep)
+                           else Modifier,
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
                     selectedTextColor = MaterialTheme.colorScheme.onSurface,

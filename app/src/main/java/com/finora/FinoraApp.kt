@@ -22,5 +22,14 @@ class FinoraApp : Application() {
             // Pay out any due interest on savings accounts.
             container.repository.applyInterestAccruals()
         }
+        // Auto-sync: if authenticated, upload local data to cloud on start
+        appScope.launch {
+            try {
+                val userId = container.authRepository.currentUserId()
+                if (userId != null) {
+                    container.syncManager.uploadAll(userId)
+                }
+            } catch (_: Exception) { /* offline or no session — skip */ }
+        }
     }
 }

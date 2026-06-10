@@ -18,7 +18,9 @@ data class AccountEntity(
     /** "DAILY"/"MONTHLY" or null if no capitalization. */
     val interestPeriod: String? = null,
     /** Last capitalization timestamp; null = never applied. */
-    val lastInterestAt: Long? = null
+    val lastInterestAt: Long? = null,
+    /** Payout time of day in minutes from midnight (0..1439). */
+    val interestPayoutMinute: Int = 9 * 60
 )
 
 @Entity(tableName = "categories")

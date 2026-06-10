@@ -20,7 +20,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.ReceiptLong
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -66,6 +68,7 @@ fun HomeScreen(
     ) {
         item { Header() }
         item { BalanceHero(state) }
+        item { AiInsightCard() }
         item {
             SectionHeader(
                 title = "Счета",
@@ -219,6 +222,74 @@ private fun FlowStat(
                 fontWeight = FontWeight.SemiBold,
                 color = Color.White
             )
+        }
+    }
+}
+
+@Composable
+private fun AiInsightCard(
+    viewModel: AiInsightViewModel = viewModel(factory = AppViewModelProvider.Factory)
+) {
+    val ai by viewModel.state.collectAsStateWithLifecycle()
+    FinoraCard {
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.AutoAwesome,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    text = "AI-аналитика",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.weight(1f)
+                )
+                if (ai.loading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(22.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                } else if (ai.configured) {
+                    TextButton(onClick = { viewModel.analyze() }) {
+                        Text(if (ai.insight == null) "Анализировать" else "Обновить")
+                    }
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            when {
+                !ai.configured -> Text(
+                    text = "Чтобы включить ИИ-анализ, добавь строку GEMINI_API_KEY=… в файл local.properties и пересобери приложение.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                ai.error != null -> Text(
+                    text = "Ошибка: ${ai.error}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error
+                )
+                ai.insight != null -> Text(
+                    text = ai.insight!!,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                else -> Text(
+                    text = "Нажми «Анализировать» — ИИ посмотрит твои доходы, расходы, счета и цели и подскажет, что улучшить.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }

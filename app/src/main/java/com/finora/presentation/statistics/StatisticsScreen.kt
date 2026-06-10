@@ -43,6 +43,7 @@ import com.finora.presentation.components.DonutChart
 import com.finora.presentation.components.DonutSlice
 import com.finora.presentation.components.EmptyState
 import com.finora.presentation.components.FinoraCard
+import com.finora.presentation.components.IconChip
 import com.finora.presentation.components.NetBar
 import com.finora.presentation.components.NetTrendChart
 import com.finora.presentation.util.chartColorAt
@@ -218,10 +219,8 @@ private fun SummaryTile(label: String, amount: Double, color: Color, modifier: M
 private fun CategoryStatRow(stat: CategoryStat, color: Color) {
     Column {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier.size(10.dp).clip(CircleShape).background(color)
-            )
-            Spacer(Modifier.width(8.dp))
+            IconChip(iconKey = stat.category.iconKey, color = color, size = 34.dp)
+            Spacer(Modifier.width(10.dp))
             Text(
                 stat.category.name,
                 modifier = Modifier.weight(1f),

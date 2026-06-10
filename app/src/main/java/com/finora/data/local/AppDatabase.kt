@@ -20,7 +20,7 @@ import com.finora.data.local.entity.TransactionEntity
         TransactionEntity::class,
         GoalEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -45,6 +45,13 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE accounts ADD COLUMN interestRate REAL NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE accounts ADD COLUMN interestPeriod TEXT")
                 db.execSQL("ALTER TABLE accounts ADD COLUMN lastInterestAt INTEGER")
+            }
+        }
+
+        /** v4: per-account interest payout time of day (minutes from midnight). */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE accounts ADD COLUMN interestPayoutMinute INTEGER NOT NULL DEFAULT 540")
             }
         }
     }

@@ -31,7 +31,8 @@ fun AccountEntity.toDomain() = Account(
     createdAt = createdAt,
     interestRate = interestRate,
     interestPeriod = parseInterestPeriod(interestPeriod),
-    lastInterestAt = lastInterestAt
+    lastInterestAt = lastInterestAt,
+    interestPayoutMinute = interestPayoutMinute
 )
 
 fun Account.toEntity() = AccountEntity(
@@ -44,7 +45,8 @@ fun Account.toEntity() = AccountEntity(
     createdAt = createdAt,
     interestRate = interestRate,
     interestPeriod = interestPeriod?.name,
-    lastInterestAt = lastInterestAt
+    lastInterestAt = lastInterestAt,
+    interestPayoutMinute = interestPayoutMinute
 )
 
 fun CategoryEntity.toDomain() = Category(

@@ -1,0 +1,122 @@
+package com.finora.presentation.home
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.finora.data.ai.GeminiClient
+import com.finora.data.repository.FinanceRepository
+import com.finora.domain.model.TransactionType
+import com.finora.presentation.util.formatMoney
+import com.finora.presentation.util.startOfMonth
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+
+data class AiInsightUiState(
+    val configured: Boolean = true,
+    val loading: Boolean = false,
+    val insight: String? = null,
+    val error: String? = null
+)
+
+/**
+ * Drives the "AI-аналитика" card on Home. Builds a compact, privacy-friendly
+ * summary (aggregates only — no raw transaction list) and asks Gemini to analyse it.
+ */
+class AiInsightViewModel(
+    private val repository: FinanceRepository,
+    private val gemini: GeminiClient = GeminiClient()
+) : ViewModel() {
+
+    private val _state = MutableStateFlow(AiInsightUiState(configured = gemini.isConfigured))
+    val state: StateFlow<AiInsightUiState> = _state.asStateFlow()
+
+    fun analyze() {
+        if (_state.value.loading) return
+        if (!gemini.isConfigured) {
+            _state.update { it.copy(configured = false) }
+            return
+        }
+        viewModelScope.launch {
+            _state.update { it.copy(loading = true, error = null) }
+            try {
+                val prompt = buildPrompt()
+                val text = gemini.generate(prompt)
+                _state.update {
+                    it.copy(
+                        loading = false,
+                        insight = text.ifBlank { "Модель вернула пустой ответ. Попробуй ещё раз." }
+                    )
+                }
+            } catch (e: Exception) {
+                _state.update { it.copy(loading = false, error = e.message ?: "Не удалось получить ответ") }
+            }
+        }
+    }
+
+    private suspend fun buildPrompt(): String {
+        val accounts = repository.observeAccountBalances().first()
+        val transactions = repository.observeTransactionDetails().first()
+        val goals = repository.observeGoals().first()
+
+        val monthStart = startOfMonth(System.currentTimeMillis())
+        val monthTx = transactions.filter { it.transaction.date >= monthStart }
+        val income = monthTx.filter { it.transaction.type == TransactionType.INCOME }
+            .sumOf { it.transaction.amount }
+        val expense = monthTx.filter { it.transaction.type == TransactionType.EXPENSE }
+            .sumOf { it.transaction.amount }
+
+        val topExpenseCats = monthTx
+            .filter { it.transaction.type == TransactionType.EXPENSE }
+            .groupBy { it.category?.name ?: "Без категории" }
+            .mapValues { (_, list) -> list.sumOf { it.transaction.amount } }
+            .entries.sortedByDescending { it.value }
+            .take(6)
+
+        val sb = StringBuilder()
+        sb.appendLine("Ты — персональный финансовый аналитик в приложении учёта личных финансов.")
+        sb.appendLine("Проанализируй данные пользователя и дай полезные выводы на русском языке.")
+        sb.appendLine("Формат ответа: 3–6 коротких пунктов с эмодзи. Будь конкретным, опирайся на цифры,")
+        sb.appendLine("отметь риски (например, расходы превышают доходы), дай 1–2 практичных совета.")
+        sb.appendLine("Не выдумывай данные, которых нет. Без вступлений и заключений — только пункты.")
+        sb.appendLine()
+        sb.appendLine("=== Данные (валюта — рубли) ===")
+        sb.appendLine("Общий баланс: ${formatMoney(accounts.sumOf { it.balance })}")
+        sb.appendLine("Доходы за текущий месяц: ${formatMoney(income)}")
+        sb.appendLine("Расходы за текущий месяц: ${formatMoney(expense)}")
+        sb.appendLine("Сальдо за месяц: ${formatMoney(income - expense)}")
+        sb.appendLine()
+        sb.appendLine("Счета:")
+        if (accounts.isEmpty()) {
+            sb.appendLine("- нет")
+        } else {
+            accounts.forEach { ab ->
+                val acc = ab.account
+                val savings = if (acc.hasInterest) " (накопительный, ${acc.interestRate}% годовых)" else ""
+                sb.appendLine("- ${acc.name}: ${formatMoney(ab.balance)}$savings")
+            }
+        }
+        sb.appendLine()
+        sb.appendLine("Топ категорий расходов за месяц:")
+        if (topExpenseCats.isEmpty()) {
+            sb.appendLine("- нет расходов в этом месяце")
+        } else {
+            topExpenseCats.forEach { (name, total) ->
+                sb.appendLine("- $name: ${formatMoney(total)}")
+            }
+        }
+        sb.appendLine()
+        sb.appendLine("Цели накоплений:")
+        if (goals.isEmpty()) {
+            sb.appendLine("- нет")
+        } else {
+            goals.forEach { g ->
+                val pct = (g.progress * 100).toInt()
+                sb.appendLine("- ${g.name}: ${formatMoney(g.savedAmount)} из ${formatMoney(g.targetAmount)} ($pct%)")
+            }
+        }
+        return sb.toString()
+    }
+}

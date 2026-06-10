@@ -59,7 +59,9 @@ data class Account(
     /** How often interest is paid out, null = disabled. */
     val interestPeriod: InterestPeriod? = null,
     /** Timestamp of the last applied capitalization (null = never). */
-    val lastInterestAt: Long? = null
+    val lastInterestAt: Long? = null,
+    /** Time of day (minutes from midnight, 0..1439) when interest is paid out. */
+    val interestPayoutMinute: Int = 9 * 60
 ) {
     val hasInterest: Boolean get() = interestPeriod != null && interestRate > 0.0
 }

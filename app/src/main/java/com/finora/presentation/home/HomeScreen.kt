@@ -76,7 +76,11 @@ fun HomeScreen(
                 BalanceHero(state)
             }
         }
-        item { AiInsightCard(onOpenAi = onOpenAi) }
+        item {
+            Box(modifier = Modifier.guideTarget(guideController, GuideStep.AI_INSIGHT)) {
+                AiInsightCard(onOpenAi = onOpenAi)
+            }
+        }
         item {
             SectionHeader(
                 title = "Счета",
@@ -85,7 +89,11 @@ fun HomeScreen(
                 }
             )
         }
-        item { AccountsStrip(state.accounts, onOpen = onSeeAccounts) }
+        item {
+            Box(modifier = Modifier.guideTarget(guideController, GuideStep.ACCOUNTS_STRIP)) {
+                AccountsStrip(state.accounts, onOpen = onSeeAccounts)
+            }
+        }
 
         item {
             SectionHeader(
@@ -95,22 +103,26 @@ fun HomeScreen(
         }
         if (state.recentTransactions.isEmpty()) {
             item {
-                FinoraCard {
-                    EmptyState(
-                        icon = Icons.Rounded.ReceiptLong,
-                        title = "Пока пусто",
-                        subtitle = "Добавьте первую операцию по кнопке +"
-                    )
+                Box(modifier = Modifier.guideTarget(guideController, GuideStep.RECENT_TRANSACTIONS)) {
+                    FinoraCard {
+                        EmptyState(
+                            icon = Icons.Rounded.ReceiptLong,
+                            title = "Пока пусто",
+                            subtitle = "Добавьте первую операцию по кнопке +"
+                        )
+                    }
                 }
             }
         } else {
             item {
-                FinoraCard(padding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)) {
-                    state.recentTransactions.forEach { details ->
-                        TransactionRow(
-                            details = details,
-                            onClick = { onOpenTransaction(details.transaction.id) }
-                        )
+                Box(modifier = Modifier.guideTarget(guideController, GuideStep.RECENT_TRANSACTIONS)) {
+                    FinoraCard(padding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)) {
+                        state.recentTransactions.forEach { details ->
+                            TransactionRow(
+                                details = details,
+                                onClick = { onOpenTransaction(details.transaction.id) }
+                            )
+                        }
                     }
                 }
             }

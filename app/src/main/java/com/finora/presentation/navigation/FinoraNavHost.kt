@@ -47,6 +47,7 @@ import com.finora.presentation.auth.AuthScreen
 import com.finora.presentation.goals.GoalsScreen
 import com.finora.presentation.guide.GuideController
 import com.finora.presentation.guide.GuideOverlay
+import com.finora.presentation.guide.GuideScreen
 import com.finora.presentation.guide.GuideStep
 import com.finora.presentation.guide.LocalGuideController
 import com.finora.presentation.guide.guideTarget
@@ -68,36 +69,53 @@ fun FinoraNavHost(navController: NavHostController = rememberNavController()) {
     val settingsRepo = app.container.settings
     val scope = rememberCoroutineScope()
 
-    // ─── Observe auth + preference states ────────────────────────────────
+    // ─── Auth + prefs ────────────────────────────────────────────────────
     val sessionStatus by SupabaseModule.client.auth.sessionStatus
         .collectAsStateWithLifecycle(initialValue = null)
     val authSkipped by settingsRepo.authSkipped
         .collectAsStateWithLifecycle(initialValue = false)
     val onboardingCompleted by settingsRepo.onboardingCompleted
-        .collectAsStateWithLifecycle(initialValue = true) // default true to avoid flash
+        .collectAsStateWithLifecycle(initialValue = true)
     val guideCompleted by settingsRepo.guideCompleted
         .collectAsStateWithLifecycle(initialValue = true)
 
-    // Guide controller — shared via CompositionLocal
-    val guideController = remember { GuideController() }
-
-    // ─── Navigation logic ────────────────────────────────────────────────
     val isAuthenticated = sessionStatus is SessionStatus.Authenticated
     val canAccessApp = isAuthenticated || authSkipped
 
+    // ─── Guide controller ────────────────────────────────────────────────
+    val guideController = remember { GuideController() }
+
+    // Wire up screen navigation for the guide
+    LaunchedEffect(Unit) {
+        guideController.navigateToScreen = { screen ->
+            val route = when (screen) {
+                GuideScreen.HOME -> Destination.Home.route
+                GuideScreen.TRANSACTIONS -> Destination.Transactions.route
+                GuideScreen.GOALS -> Destination.Goals.route
+                GuideScreen.SETTINGS -> Destination.Settings.route
+            }
+            if (currentRoute != route) {
+                navController.navigate(route) {
+                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                    launchSingleTop = true
+                    restoreState = true
+                }
+            }
+        }
+    }
+
+    // ─── Auth navigation ─────────────────────────────────────────────────
     LaunchedEffect(sessionStatus, authSkipped, onboardingCompleted) {
         when {
-            // Authenticated or skipped → go to onboarding or home
             canAccessApp -> {
                 if (currentRoute == Destination.Auth.route) {
                     val next = if (!onboardingCompleted) Destination.Onboarding.route
-                                else Destination.Home.route
+                    else Destination.Home.route
                     navController.navigate(next) {
                         popUpTo(Destination.Auth.route) { inclusive = true }
                     }
                 }
             }
-            // Not authenticated and not skipped → must auth
             sessionStatus is SessionStatus.NotAuthenticated -> {
                 if (currentRoute != Destination.Auth.route) {
                     navController.navigate(Destination.Auth.route) {
@@ -108,7 +126,7 @@ fun FinoraNavHost(navController: NavHostController = rememberNavController()) {
         }
     }
 
-    // Auto-sync on start (once) when authenticated
+    // Auto-sync on start
     LaunchedEffect(isAuthenticated) {
         if (isAuthenticated) {
             launch(Dispatchers.IO) {
@@ -120,7 +138,7 @@ fun FinoraNavHost(navController: NavHostController = rememberNavController()) {
         }
     }
 
-    // Start guide after onboarding is done and guide hasn't been shown
+    // Start guide after onboarding
     LaunchedEffect(onboardingCompleted, guideCompleted) {
         if (onboardingCompleted && !guideCompleted && canAccessApp) {
             guideController.start()
@@ -148,7 +166,7 @@ fun FinoraNavHost(navController: NavHostController = rememberNavController()) {
                 },
                 floatingActionButton = {
                     val onTransactionTabs = currentRoute == Destination.Home.route ||
-                        currentRoute == Destination.Transactions.route
+                            currentRoute == Destination.Transactions.route
                     AnimatedVisibility(
                         visible = onTransactionTabs,
                         enter = fadeIn(),
@@ -179,8 +197,7 @@ fun FinoraNavHost(navController: NavHostController = rememberNavController()) {
                     composable(Destination.Auth.route) {
                         AuthScreen(
                             onSkipped = {
-                                val next = Destination.Onboarding.route
-                                navController.navigate(next) {
+                                navController.navigate(Destination.Onboarding.route) {
                                     popUpTo(Destination.Auth.route) { inclusive = true }
                                 }
                             }
@@ -189,9 +206,7 @@ fun FinoraNavHost(navController: NavHostController = rememberNavController()) {
                     composable(Destination.Onboarding.route) {
                         OnboardingScreen(
                             onFinish = {
-                                scope.launch {
-                                    settingsRepo.setOnboardingCompleted(true)
-                                }
+                                scope.launch { settingsRepo.setOnboardingCompleted(true) }
                                 navController.navigate(Destination.Home.route) {
                                     popUpTo(Destination.Onboarding.route) { inclusive = true }
                                 }
@@ -243,13 +258,11 @@ fun FinoraNavHost(navController: NavHostController = rememberNavController()) {
                 }
             }
 
-            // ─── Guide overlay (above Scaffold) ──────────────────────────
-            if (guideController.isActive && currentRoute == Destination.Home.route) {
+            // ─── Guide overlay (on all main screens) ─────────────────────
+            if (guideController.isActive && showBars) {
                 GuideOverlay(
                     controller = guideController,
-                    onFinish = {
-                        scope.launch { settingsRepo.setGuideCompleted(true) }
-                    }
+                    onFinish = { scope.launch { settingsRepo.setGuideCompleted(true) } }
                 )
             }
         }
@@ -271,7 +284,6 @@ private fun FinoraBottomBar(
                 it.route == item.destination.route
             } == true
 
-            // Map bottom nav index to guide step
             val guideStep = when (index) {
                 1 -> GuideStep.NAV_TRANSACTIONS
                 2 -> GuideStep.NAV_GOALS
@@ -293,7 +305,7 @@ private fun FinoraBottomBar(
                 icon = { Icon(item.icon, contentDescription = item.label) },
                 label = { Text(item.label, style = MaterialTheme.typography.labelMedium) },
                 modifier = if (guideStep >= 0) Modifier.guideTarget(guideController, guideStep)
-                           else Modifier,
+                else Modifier,
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
                     selectedTextColor = MaterialTheme.colorScheme.onSurface,

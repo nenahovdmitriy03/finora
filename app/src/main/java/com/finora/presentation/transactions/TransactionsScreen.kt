@@ -9,6 +9,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import com.finora.presentation.guide.GuideStep
+import com.finora.presentation.guide.LocalGuideController
+import com.finora.presentation.guide.guideTarget
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -56,6 +59,7 @@ fun TransactionsScreen(
     viewModel: TransactionsViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val guideController = LocalGuideController.current
 
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
@@ -71,15 +75,20 @@ fun TransactionsScreen(
         }
 
         item {
-            CategoryBreakdownCard(
-                state = state,
-                onPrev = viewModel::previousMonth,
-                onNext = viewModel::nextMonth
-            )
+            Box(modifier = Modifier.guideTarget(guideController, GuideStep.TX_BREAKDOWN)) {
+                CategoryBreakdownCard(
+                    state = state,
+                    onPrev = viewModel::previousMonth,
+                    onNext = viewModel::nextMonth
+                )
+            }
         }
 
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.guideTarget(guideController, GuideStep.TX_FILTERS)
+            ) {
                 FilterPill("Все", state.filter == TxFilter.ALL) { viewModel.setFilter(TxFilter.ALL) }
                 FilterPill("Доходы", state.filter == TxFilter.INCOME) { viewModel.setFilter(TxFilter.INCOME) }
                 FilterPill("Расходы", state.filter == TxFilter.EXPENSE) { viewModel.setFilter(TxFilter.EXPENSE) }

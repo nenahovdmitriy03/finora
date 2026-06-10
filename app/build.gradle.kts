@@ -8,14 +8,15 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
-// API key is read from local.properties (NOT committed). Add a line:
-//   GEMINI_API_KEY=your_key_here
-val geminiApiKey: String = run {
-    val props = Properties()
+// AI keys are read from local.properties (NOT committed). Add any of:
+//   GEMINI_API_KEY=...        (Google AI Studio)
+//   OPENROUTER_API_KEY=...    (openrouter.ai — many free models)
+//   GROQ_API_KEY=...          (console.groq.com — fast, free)
+val localProps: Properties = Properties().apply {
     val file = rootProject.file("local.properties")
-    if (file.exists()) FileInputStream(file).use { props.load(it) }
-    props.getProperty("GEMINI_API_KEY", "")
+    if (file.exists()) FileInputStream(file).use { load(it) }
 }
+fun secret(name: String): String = localProps.getProperty(name, "")
 
 android {
     namespace = "com.finora"
@@ -28,7 +29,9 @@ android {
         versionCode = 1
         versionName = "1.0"
         vectorDrawables { useSupportLibrary = true }
-        buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
+        buildConfigField("String", "GEMINI_API_KEY", "\"${secret("GEMINI_API_KEY")}\"")
+        buildConfigField("String", "OPENROUTER_API_KEY", "\"${secret("OPENROUTER_API_KEY")}\"")
+        buildConfigField("String", "GROQ_API_KEY", "\"${secret("GROQ_API_KEY")}\"")
     }
 
     buildTypes {

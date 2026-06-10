@@ -2,7 +2,8 @@ package com.finora.presentation.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.finora.data.ai.GeminiClient
+import com.finora.data.ai.AiEngine
+import com.finora.data.ai.AiProviders
 import com.finora.data.repository.FinanceRepository
 import com.finora.domain.model.TransactionType
 import com.finora.presentation.util.formatMoney
@@ -16,6 +17,7 @@ import kotlinx.coroutines.launch
 
 data class AiInsightUiState(
     val configured: Boolean = true,
+    val provider: String? = null,
     val loading: Boolean = false,
     val insight: String? = null,
     val error: String? = null
@@ -23,19 +25,23 @@ data class AiInsightUiState(
 
 /**
  * Drives the "AI-аналитика" card on Home. Builds a compact, privacy-friendly
- * summary (aggregates only — no raw transaction list) and asks Gemini to analyse it.
+ * summary (aggregates only — no raw transaction list) and asks the configured
+ * AI provider (OpenRouter / Groq / Gemini) to analyse it.
  */
 class AiInsightViewModel(
     private val repository: FinanceRepository,
-    private val gemini: GeminiClient = GeminiClient()
+    private val engine: AiEngine? = AiProviders.firstConfigured()
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(AiInsightUiState(configured = gemini.isConfigured))
+    private val _state = MutableStateFlow(
+        AiInsightUiState(configured = engine != null, provider = engine?.label)
+    )
     val state: StateFlow<AiInsightUiState> = _state.asStateFlow()
 
     fun analyze() {
         if (_state.value.loading) return
-        if (!gemini.isConfigured) {
+        val active = engine
+        if (active == null) {
             _state.update { it.copy(configured = false) }
             return
         }
@@ -43,7 +49,7 @@ class AiInsightViewModel(
             _state.update { it.copy(loading = true, error = null) }
             try {
                 val prompt = buildPrompt()
-                val text = gemini.generate(prompt)
+                val text = active.generate(prompt)
                 _state.update {
                     it.copy(
                         loading = false,

@@ -249,12 +249,20 @@ private fun AiInsightCard(
                     )
                 }
                 Spacer(Modifier.width(10.dp))
-                Text(
-                    text = "AI-аналитика",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.weight(1f)
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "AI-аналитика",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    ai.provider?.let { provider ->
+                        Text(
+                            text = "через $provider",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
                 if (ai.loading) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(22.dp),
@@ -270,7 +278,10 @@ private fun AiInsightCard(
             Spacer(Modifier.height(6.dp))
             when {
                 !ai.configured -> Text(
-                    text = "Чтобы включить ИИ-анализ, добавь строку GEMINI_API_KEY=… в файл local.properties и пересобери приложение.",
+                    text = "Чтобы включить ИИ-анализ, добавь в local.properties ключ одного из провайдеров и пересобери:\n" +
+                        "• OPENROUTER_API_KEY (openrouter.ai — много бесплатных моделей)\n" +
+                        "• GROQ_API_KEY (console.groq.com — быстро и бесплатно)\n" +
+                        "• GEMINI_API_KEY (Google AI Studio)",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

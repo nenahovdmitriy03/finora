@@ -11,15 +11,16 @@ import com.google.ai.client.generativeai.GenerativeModel
 class GeminiClient(
     private val apiKey: String = BuildConfig.GEMINI_API_KEY,
     private val modelName: String = DEFAULT_MODEL
-) {
-    val isConfigured: Boolean get() = apiKey.isNotBlank()
+) : AiEngine {
+    override val label: String = "Gemini"
+    override val isConfigured: Boolean get() = apiKey.isNotBlank()
 
     private val model: GenerativeModel by lazy {
         GenerativeModel(modelName = modelName, apiKey = apiKey)
     }
 
     /** Sends [prompt] and returns the model's plain-text reply. Throws on network/API errors. */
-    suspend fun generate(prompt: String): String {
+    override suspend fun generate(prompt: String): String {
         val response = model.generateContent(prompt)
         return response.text?.trim().orEmpty()
     }

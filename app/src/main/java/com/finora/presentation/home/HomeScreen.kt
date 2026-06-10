@@ -47,6 +47,9 @@ import com.finora.presentation.components.IconChip
 import com.finora.presentation.components.SectionHeader
 import com.finora.presentation.components.TransactionRow
 import com.finora.presentation.theme.LocalFinoraColors
+import com.finora.presentation.guide.GuideStep
+import com.finora.presentation.guide.LocalGuideController
+import com.finora.presentation.guide.guideTarget
 import com.finora.presentation.util.formatMoney
 
 @Composable
@@ -60,6 +63,7 @@ fun HomeScreen(
     viewModel: HomeViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val guideController = LocalGuideController.current
 
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
@@ -67,7 +71,11 @@ fun HomeScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item { Header() }
-        item { BalanceHero(state) }
+        item {
+            Box(modifier = Modifier.guideTarget(guideController, GuideStep.BALANCE_HERO)) {
+                BalanceHero(state)
+            }
+        }
         item { AiInsightCard(onOpenAi = onOpenAi) }
         item {
             SectionHeader(

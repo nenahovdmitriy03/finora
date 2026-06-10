@@ -21,28 +21,37 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material.icons.rounded.AccountBalanceWallet
-import androidx.compose.material.icons.rounded.CloudDownload
-import androidx.compose.material.icons.rounded.CloudUpload
 import androidx.compose.material.icons.rounded.DarkMode
+import androidx.compose.material.icons.rounded.DeleteForever
 import androidx.compose.material.icons.rounded.LightMode
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.SettingsBrightness
+import androidx.compose.material.icons.rounded.Warning
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Cloud
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.finora.data.remote.AuthRepository
@@ -51,6 +60,9 @@ import com.finora.domain.model.ThemeMode
 import com.finora.presentation.AppViewModelProvider
 import com.finora.presentation.components.FinoraCard
 import com.finora.presentation.components.SectionHeader
+import com.finora.presentation.guide.GuideStep
+import com.finora.presentation.guide.LocalGuideController
+import com.finora.presentation.guide.guideTarget
 
 @Composable
 fun SettingsScreen(
@@ -60,7 +72,10 @@ fun SettingsScreen(
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val accent by viewModel.accentColor.collectAsStateWithLifecycle()
     val authState by viewModel.authState.collectAsStateWithLifecycle()
-    val syncStatus by viewModel.syncStatus.collectAsStateWithLifecycle()
+    val deleteStatus by viewModel.deleteStatus.collectAsStateWithLifecycle()
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
+    val guideController = LocalGuideController.current
 
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
@@ -88,33 +103,11 @@ fun SettingsScreen(
                             subtitle = "Вы вошли в аккаунт",
                             onClick = {}
                         )
-                        // Sync to cloud
                         SettingRow(
-                            icon = Icons.Rounded.CloudUpload,
-                            title = "Сохранить в облако",
-                            subtitle = when (syncStatus) {
-                                is SettingsViewModel.SyncStatus.Syncing -> "Синхронизация..."
-                                is SettingsViewModel.SyncStatus.Success -> "Данные сохранены ✓"
-                                is SettingsViewModel.SyncStatus.Error ->
-                                    (syncStatus as SettingsViewModel.SyncStatus.Error).message
-                                else -> "Загрузить все данные в Supabase"
-                            },
-                            onClick = viewModel::syncToCloud,
-                            trailing = {
-                                if (syncStatus is SettingsViewModel.SyncStatus.Syncing) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(20.dp),
-                                        strokeWidth = 2.dp
-                                    )
-                                }
-                            }
-                        )
-                        // Restore from cloud
-                        SettingRow(
-                            icon = Icons.Rounded.CloudDownload,
-                            title = "Восстановить из облака",
-                            subtitle = "Загрузить данные с сервера",
-                            onClick = viewModel::restoreFromCloud
+                            icon = Icons.Rounded.Cloud,
+                            title = "Облачная синхронизация",
+                            subtitle = "Данные синхронизируются автоматически",
+                            onClick = {}
                         )
                         // Logout
                         SettingRow(
@@ -122,14 +115,30 @@ fun SettingsScreen(
                             title = "Выйти",
                             subtitle = "Выйти из аккаунта",
                             onClick = viewModel::signOut,
-                            tint = MaterialTheme.colorScheme.error
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        // Delete account
+                        SettingRow(
+                            icon = Icons.Rounded.DeleteForever,
+                            title = "Удалить аккаунт",
+                            subtitle = "Удалить все данные безвозвратно",
+                            onClick = { showDeleteDialog = true },
+                            tint = MaterialTheme.colorScheme.error,
+                            trailing = {
+                                if (deleteStatus is SettingsViewModel.DeleteStatus.Deleting) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                }
+                            }
                         )
                     }
                 }
             } else {
                 FinoraCard {
                     Text(
-                        "Войдите в аккаунт для синхронизации данных",
+                        "Вы используете приложение без аккаунта. Данные хранятся только на устройстве.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -175,6 +184,54 @@ fun SettingsScreen(
                 }
             }
         }
+    }
+
+    // ─── Delete confirmation dialog ──────────────────────────────────────
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            icon = {
+                Icon(
+                    Icons.Rounded.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    "Удалить аккаунт?",
+                    style = MaterialTheme.typography.titleLarge,
+                    textAlign = TextAlign.Center
+                )
+            },
+            text = {
+                Text(
+                    "Все ваши данные будут удалены из облака и с устройства. " +
+                    "Это действие необратимо.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteDialog = false
+                        viewModel.deleteAccount()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Удалить", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Отмена")
+                }
+            }
+        )
     }
 }
 

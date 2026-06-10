@@ -2,6 +2,7 @@ package com.finora.presentation.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.finora.data.preferences.SettingsRepository
 import com.finora.data.remote.AuthRepository
 import com.finora.data.remote.SyncManager
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,27 +16,38 @@ data class AuthUiState(
     val isLogin: Boolean = true,
     val isLoading: Boolean = false,
     val error: String? = null,
-    val success: Boolean = false
+    val info: String? = null,
+    val success: Boolean = false,
+    val skipped: Boolean = false
 )
 
 class AuthViewModel(
     private val authRepo: AuthRepository,
-    private val syncManager: SyncManager
+    private val syncManager: SyncManager,
+    private val settings: SettingsRepository
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(AuthUiState())
     val state: StateFlow<AuthUiState> = _state.asStateFlow()
 
     fun onEmailChange(value: String) {
-        _state.value = _state.value.copy(email = value.trim(), error = null)
+        _state.value = _state.value.copy(email = value.trim(), error = null, info = null)
     }
 
     fun onPasswordChange(value: String) {
-        _state.value = _state.value.copy(password = value, error = null)
+        _state.value = _state.value.copy(password = value, error = null, info = null)
     }
 
     fun toggleMode() {
-        _state.value = _state.value.copy(isLogin = !_state.value.isLogin, error = null)
+        _state.value = _state.value.copy(isLogin = !_state.value.isLogin, error = null, info = null)
+    }
+
+    /** Skip authentication — use app locally without an account. */
+    fun skipAuth() {
+        viewModelScope.launch {
+            settings.setAuthSkipped(true)
+            _state.value = _state.value.copy(skipped = true)
+        }
     }
 
     fun submit() {
@@ -44,38 +56,62 @@ class AuthViewModel(
             _state.value = s.copy(error = "Введите email и пароль (мин. 6 символов)")
             return
         }
-        _state.value = s.copy(isLoading = true, error = null)
+        _state.value = s.copy(isLoading = true, error = null, info = null)
 
         viewModelScope.launch {
             try {
                 if (s.isLogin) {
                     authRepo.signIn(s.email, s.password)
-                    // After login — try to restore data from cloud
                     val userId = authRepo.currentUserId()
                     if (userId != null) {
                         try { syncManager.downloadAll(userId) } catch (_: Exception) { }
                     }
+                    _state.value = _state.value.copy(isLoading = false, success = true)
                 } else {
                     authRepo.signUp(s.email, s.password)
-                    // After registration — upload local data to cloud
                     val userId = authRepo.currentUserId()
                     if (userId != null) {
                         try { syncManager.uploadAll(userId) } catch (_: Exception) { }
+                        _state.value = _state.value.copy(isLoading = false, success = true)
+                    } else {
+                        _state.value = _state.value.copy(
+                            isLoading = false,
+                            info = "Письмо для подтверждения отправлено на ${s.email}. Проверьте почту и перейдите по ссылке, затем нажмите «Войти»."
+                        )
                     }
                 }
-                _state.value = _state.value.copy(isLoading = false, success = true)
             } catch (e: Exception) {
-                val msg = when {
-                    e.message?.contains("Invalid login", true) == true ->
-                        "Неверный email или пароль"
-                    e.message?.contains("already registered", true) == true ->
-                        "Этот email уже зарегистрирован"
-                    e.message?.contains("valid email", true) == true ->
-                        "Некорректный email"
-                    else -> e.message ?: "Ошибка авторизации"
-                }
+                val msg = translateError(e.message)
                 _state.value = _state.value.copy(isLoading = false, error = msg)
             }
+        }
+    }
+
+    private fun translateError(raw: String?): String {
+        if (raw == null) return "Ошибка авторизации"
+        val lower = raw.lowercase()
+        return when {
+            "invalid login" in lower || "invalid_credentials" in lower ->
+                "Неверный email или пароль"
+            "already registered" in lower || "already been registered" in lower ->
+                "Этот email уже зарегистрирован. Нажмите «Войти»."
+            "valid email" in lower || "invalid email" in lower ->
+                "Некорректный формат email"
+            "email not confirmed" in lower ->
+                "Email не подтверждён. Проверьте почту и перейдите по ссылке."
+            "rate" in lower || "security purposes" in lower || "after 45 seconds" in lower
+                    || "request this after" in lower || "too many requests" in lower ->
+                "Слишком частые запросы. Подождите минуту и попробуйте снова."
+            "network" in lower || "unable to resolve" in lower || "timeout" in lower
+                    || "connect" in lower ->
+                "Нет подключения к интернету. Проверьте сеть."
+            "weak password" in lower || "at least" in lower ->
+                "Пароль слишком простой. Минимум 6 символов."
+            "user not found" in lower ->
+                "Пользователь не найден"
+            "signup is disabled" in lower ->
+                "Регистрация временно отключена"
+            else -> raw
         }
     }
 }

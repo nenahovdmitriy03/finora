@@ -7,6 +7,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import com.finora.domain.model.AccentColor
 import com.finora.domain.model.ThemeMode
 import com.finora.presentation.navigation.FinoraNavHost
@@ -29,5 +31,14 @@ class MainActivity : ComponentActivity() {
                 FinoraNavHost()
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Pay out any interest that became due while the app was in the background,
+        // so capitalization appears as soon as the user opens the app (not only on
+        // a cold start). Idempotent — only books periods that actually elapsed.
+        val repository = (application as FinoraApp).container.repository
+        lifecycleScope.launch { repository.applyInterestAccruals() }
     }
 }

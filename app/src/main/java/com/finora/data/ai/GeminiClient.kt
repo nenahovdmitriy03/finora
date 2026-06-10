@@ -25,7 +25,7 @@ class GeminiClient(
     }
 
     companion object {
-        // Free-tier model. Change here if you want another (e.g. "gemini-1.5-flash").
-        const val DEFAULT_MODEL = "gemini-2.0-flash"
+        // Free-tier model. Change here if you want another (e.g. "gemini-2.0-flash").
+        const val DEFAULT_MODEL = "gemini-1.5-flash"
     }
 }

@@ -51,7 +51,6 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInRoot
@@ -316,11 +315,16 @@ fun GuideOverlay(
     }
 }
 
-// ─── Anime girl mascot (chibi, blue theme) ───────────────────────────────────
+// ─── Anime girl mascot — silver hair, blue eyes, school uniform ──────────────
 
 /**
- * Cute chibi anime girl with blue hair, big eyes, and a blue outfit.
- * All drawn with Canvas — no external assets needed.
+ * Cute chibi anime girl mascot based on reference:
+ * - Long silver / light-pink hair with ahoge (antenna strand)
+ * - Red ribbon hair ties on both sides
+ * - Big blue eyes with detailed highlights
+ * - Dark school vest + white shirt + red bow tie
+ * - Blushing pink cheeks
+ * All drawn with Canvas — no external assets.
  */
 @Composable
 fun MascotGirl(modifier: Modifier = Modifier) {
@@ -329,231 +333,394 @@ fun MascotGirl(modifier: Modifier = Modifier) {
         val h = size.height
         val cx = w / 2f
 
-        // Colors
-        val hairDark = Color(0xFF2B5EA7)
-        val hairLight = Color(0xFF5B9BD5)
-        val hairHighlight = Color(0xFF8EC8F6)
-        val skin = Color(0xFFFFE0CC)
-        val skinShadow = Color(0xFFFFCDB2)
-        val eyeBlue = Color(0xFF3A7BD5)
-        val eyeLight = Color(0xFF6FB3F2)
-        val white = Color.White
-        val black = Color(0xFF2D2D2D)
-        val blush = Color(0xFFFF9EB1)
-        val dressBlue = Color(0xFF3B6FB5)
-        val dressDark = Color(0xFF2A5494)
-        val collarWhite = Color(0xFFE8F0FE)
+        // ─── Colors ──────────────────────────────────────────────────
+        val hairSilver = Color(0xFFD8D0E0)       // main hair
+        val hairLight = Color(0xFFEDE8F0)         // highlights
+        val hairShadow = Color(0xFFC0B5CC)        // shadow strands
+        val hairTips = Color(0xFFE8D8E8)          // lighter tips
+        val ribbonRed = Color(0xFFE03050)         // red ribbons
+        val ribbonDark = Color(0xFFC02040)
 
-        // ── Body / Dress ──
-        val bodyTop = h * 0.62f
-        val bodyPath = Path().apply {
-            moveTo(cx - w * 0.18f, bodyTop)
-            // Shoulders + dress shape
+        val skin = Color(0xFFFFE8D8)
+        val skinShadow = Color(0xFFFFD4BC)
+        val blush = Color(0xFFFFB0C0)
+
+        val eyeBlue = Color(0xFF4090D0)
+        val eyeLight = Color(0xFF70B8F0)
+        val eyeDark = Color(0xFF2060A0)
+        val white = Color.White
+        val black = Color(0xFF303030)
+
+        val vestDark = Color(0xFF404550)          // dark vest
+        val vestMid = Color(0xFF505560)
+        val shirtWhite = Color(0xFFF5F0F0)
+        val collarWhite = Color(0xFFFFFFFF)
+        val bowRed = Color(0xFFD03050)
+        val bowDarkRed = Color(0xFFB02040)
+
+        // ─── Body / Uniform ─────────────────────────────────────────
+        val bodyTop = h * 0.63f
+
+        // Shirt collar visible above vest
+        val collarPath = Path().apply {
+            moveTo(cx - w * 0.14f, bodyTop - h * 0.01f)
+            lineTo(cx - w * 0.08f, bodyTop + h * 0.08f)
+            lineTo(cx, bodyTop + h * 0.04f)
+            lineTo(cx + w * 0.08f, bodyTop + h * 0.08f)
+            lineTo(cx + w * 0.14f, bodyTop - h * 0.01f)
+            close()
+        }
+        drawPath(collarPath, collarWhite)
+
+        // Dark vest / jumper dress
+        val vestPath = Path().apply {
+            moveTo(cx - w * 0.20f, bodyTop + h * 0.02f)
             cubicTo(
-                cx - w * 0.28f, bodyTop + h * 0.06f,
-                cx - w * 0.25f, h * 0.95f,
+                cx - w * 0.26f, bodyTop + h * 0.10f,
+                cx - w * 0.22f, h * 0.92f,
                 cx, h * 0.97f
             )
             cubicTo(
-                cx + w * 0.25f, h * 0.95f,
-                cx + w * 0.28f, bodyTop + h * 0.06f,
-                cx + w * 0.18f, bodyTop
+                cx + w * 0.22f, h * 0.92f,
+                cx + w * 0.26f, bodyTop + h * 0.10f,
+                cx + w * 0.20f, bodyTop + h * 0.02f
             )
             close()
         }
-        drawPath(bodyPath, dressDark)
-        drawPath(bodyPath, dressBlue)
+        drawPath(vestPath, vestDark)
 
-        // Collar / ribbon detail
-        val collarPath = Path().apply {
-            moveTo(cx - w * 0.1f, bodyTop + h * 0.01f)
-            lineTo(cx, bodyTop + h * 0.1f)
-            lineTo(cx + w * 0.1f, bodyTop + h * 0.01f)
+        // Vest V-neckline showing shirt
+        val vneckPath = Path().apply {
+            moveTo(cx - w * 0.12f, bodyTop + h * 0.02f)
+            lineTo(cx, bodyTop + h * 0.14f)
+            lineTo(cx + w * 0.12f, bodyTop + h * 0.02f)
+            close()
         }
-        drawPath(collarPath, collarWhite, style = Stroke(width = w * 0.025f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        drawPath(vneckPath, shirtWhite)
 
-        // Small bow at collar
-        drawCircle(Color(0xFFFF6B8A), radius = w * 0.025f, center = Offset(cx, bodyTop + h * 0.02f))
+        // Vest edge lines (subtle)
+        drawLine(vestMid, Offset(cx - w * 0.12f, bodyTop + h * 0.02f),
+            Offset(cx, bodyTop + h * 0.14f), strokeWidth = 1.5f, cap = StrokeCap.Round)
+        drawLine(vestMid, Offset(cx + w * 0.12f, bodyTop + h * 0.02f),
+            Offset(cx, bodyTop + h * 0.14f), strokeWidth = 1.5f, cap = StrokeCap.Round)
 
-        // ── Neck ──
+        // Red bow tie
+        // Left wing
+        val bowLeft = Path().apply {
+            moveTo(cx - w * 0.01f, bodyTop + h * 0.06f)
+            cubicTo(
+                cx - w * 0.08f, bodyTop + h * 0.03f,
+                cx - w * 0.10f, bodyTop + h * 0.09f,
+                cx - w * 0.01f, bodyTop + h * 0.07f
+            )
+            close()
+        }
+        drawPath(bowLeft, bowRed)
+        // Right wing
+        val bowRight = Path().apply {
+            moveTo(cx + w * 0.01f, bodyTop + h * 0.06f)
+            cubicTo(
+                cx + w * 0.08f, bodyTop + h * 0.03f,
+                cx + w * 0.10f, bodyTop + h * 0.09f,
+                cx + w * 0.01f, bodyTop + h * 0.07f
+            )
+            close()
+        }
+        drawPath(bowRight, bowRed)
+        // Bow center knot
+        drawCircle(bowDarkRed, radius = w * 0.02f, center = Offset(cx, bodyTop + h * 0.065f))
+
+        // Gold buttons on vest
+        drawCircle(Color(0xFFD4A850), radius = w * 0.015f, center = Offset(cx - w * 0.04f, bodyTop + h * 0.18f))
+        drawCircle(Color(0xFFD4A850), radius = w * 0.015f, center = Offset(cx - w * 0.04f, bodyTop + h * 0.25f))
+
+        // ─── Neck ───────────────────────────────────────────────────
         drawRect(skin, topLeft = Offset(cx - w * 0.06f, h * 0.58f), size = Size(w * 0.12f, h * 0.08f))
 
-        // ── Head (big chibi head) ──
+        // ─── Head (big chibi head) ──────────────────────────────────
         val headCy = h * 0.34f
-        val headRx = w * 0.32f
+        val headRx = w * 0.33f
         val headRy = h * 0.28f
 
-        // Hair back (behind head)
-        drawOval(hairDark, topLeft = Offset(cx - headRx - w * 0.04f, headCy - headRy - h * 0.01f),
-            size = Size((headRx + w * 0.04f) * 2, (headRy + h * 0.12f) * 2))
+        // Hair back layer (behind head)
+        // Long flowing hair going down past shoulders
+        val hairBackPath = Path().apply {
+            moveTo(cx - headRx - w * 0.02f, headCy)
+            // Left flowing strand
+            cubicTo(
+                cx - headRx - w * 0.06f, headCy + headRy * 1.5f,
+                cx - headRx + w * 0.02f, h * 0.80f,
+                cx - w * 0.12f, h * 0.90f
+            )
+            lineTo(cx + w * 0.12f, h * 0.90f)
+            cubicTo(
+                cx + headRx - w * 0.02f, h * 0.80f,
+                cx + headRx + w * 0.06f, headCy + headRy * 1.5f,
+                cx + headRx + w * 0.02f, headCy
+            )
+            close()
+        }
+        drawPath(hairBackPath, hairShadow)
+        // Hair strand details on back hair
+        drawLine(hairTips, Offset(cx - w * 0.18f, h * 0.70f), Offset(cx - w * 0.15f, h * 0.85f),
+            strokeWidth = 1.5f, cap = StrokeCap.Round)
+        drawLine(hairTips, Offset(cx + w * 0.18f, h * 0.70f), Offset(cx + w * 0.15f, h * 0.85f),
+            strokeWidth = 1.5f, cap = StrokeCap.Round)
 
         // Face
         drawOval(skin, topLeft = Offset(cx - headRx, headCy - headRy), size = Size(headRx * 2, headRy * 2))
-        // Subtle face shadow on bottom
+        // Subtle chin shadow
         drawArc(skinShadow, startAngle = 20f, sweepAngle = 140f, useCenter = true,
-            topLeft = Offset(cx - headRx * 0.8f, headCy + headRy * 0.3f),
-            size = Size(headRx * 1.6f, headRy * 0.6f))
+            topLeft = Offset(cx - headRx * 0.7f, headCy + headRy * 0.45f),
+            size = Size(headRx * 1.4f, headRy * 0.5f))
 
-        // ── Hair (bangs + sides) ──
-        // Top hair volume
+        // ─── Hair (silver/pink — bangs + side strands) ──────────────
+
+        // Top hair volume — big fluffy top
         val hairTopPath = Path().apply {
-            moveTo(cx - headRx - w * 0.03f, headCy - headRy * 0.1f)
+            moveTo(cx - headRx - w * 0.04f, headCy - headRy * 0.05f)
             cubicTo(
-                cx - headRx * 0.5f, headCy - headRy - h * 0.15f,
-                cx + headRx * 0.5f, headCy - headRy - h * 0.15f,
-                cx + headRx + w * 0.03f, headCy - headRy * 0.1f
+                cx - headRx * 0.5f, headCy - headRy - h * 0.17f,
+                cx + headRx * 0.5f, headCy - headRy - h * 0.17f,
+                cx + headRx + w * 0.04f, headCy - headRy * 0.05f
             )
-            // Crown arc
             cubicTo(
-                cx + headRx * 0.3f, headCy - headRy * 0.6f,
-                cx - headRx * 0.3f, headCy - headRy * 0.6f,
-                cx - headRx - w * 0.03f, headCy - headRy * 0.1f
+                cx + headRx * 0.3f, headCy - headRy * 0.55f,
+                cx - headRx * 0.3f, headCy - headRy * 0.55f,
+                cx - headRx - w * 0.04f, headCy - headRy * 0.05f
             )
             close()
         }
-        drawPath(hairTopPath, hairDark)
-        // Hair highlight streak
+        drawPath(hairTopPath, hairSilver)
+
+        // Hair highlight on top
         drawPath(Path().apply {
-            moveTo(cx - w * 0.05f, headCy - headRy - h * 0.06f)
-            cubicTo(cx, headCy - headRy - h * 0.1f, cx + w * 0.1f, headCy - headRy - h * 0.06f,
-                cx + w * 0.05f, headCy - headRy * 0.5f)
-        }, hairHighlight, style = Stroke(width = w * 0.03f, cap = StrokeCap.Round))
+            moveTo(cx - w * 0.06f, headCy - headRy - h * 0.07f)
+            cubicTo(cx - w * 0.02f, headCy - headRy - h * 0.12f,
+                cx + w * 0.08f, headCy - headRy - h * 0.08f,
+                cx + w * 0.04f, headCy - headRy * 0.45f)
+        }, hairLight, style = Stroke(width = w * 0.025f, cap = StrokeCap.Round))
 
-        // Bangs — jagged fringe
+        // Ahoge (antenna hair strand at top)
+        val ahogePath = Path().apply {
+            moveTo(cx - w * 0.02f, headCy - headRy - h * 0.08f)
+            cubicTo(
+                cx + w * 0.02f, headCy - headRy - h * 0.18f,
+                cx + w * 0.08f, headCy - headRy - h * 0.16f,
+                cx + w * 0.04f, headCy - headRy - h * 0.10f
+            )
+        }
+        drawPath(ahogePath, hairSilver, style = Stroke(width = w * 0.02f, cap = StrokeCap.Round))
+
+        // Bangs — soft jagged fringe
         val bangsPath = Path().apply {
-            moveTo(cx - headRx * 0.95f, headCy - headRy * 0.2f)
-            lineTo(cx - headRx * 0.65f, headCy + headRy * 0.15f)
-            lineTo(cx - headRx * 0.4f, headCy - headRy * 0.05f)
-            lineTo(cx - headRx * 0.15f, headCy + headRy * 0.2f)
-            lineTo(cx + headRx * 0.1f, headCy - headRy * 0.0f)
-            lineTo(cx + headRx * 0.35f, headCy + headRy * 0.15f)
-            lineTo(cx + headRx * 0.6f, headCy - headRy * 0.08f)
-            lineTo(cx + headRx * 0.85f, headCy + headRy * 0.1f)
-            lineTo(cx + headRx * 0.95f, headCy - headRy * 0.2f)
-            // Connect back over the top
+            moveTo(cx - headRx * 0.92f, headCy - headRy * 0.15f)
+            lineTo(cx - headRx * 0.65f, headCy + headRy * 0.12f)
+            lineTo(cx - headRx * 0.42f, headCy - headRy * 0.02f)
+            lineTo(cx - headRx * 0.18f, headCy + headRy * 0.18f)
+            lineTo(cx + headRx * 0.08f, headCy + headRy * 0.02f)
+            lineTo(cx + headRx * 0.32f, headCy + headRy * 0.15f)
+            lineTo(cx + headRx * 0.58f, headCy - headRy * 0.05f)
+            lineTo(cx + headRx * 0.80f, headCy + headRy * 0.08f)
+            lineTo(cx + headRx * 0.92f, headCy - headRy * 0.15f)
+            // Connect over the top
             cubicTo(
-                cx + headRx * 0.5f, headCy - headRy - h * 0.1f,
-                cx - headRx * 0.5f, headCy - headRy - h * 0.1f,
-                cx - headRx * 0.95f, headCy - headRy * 0.2f
+                cx + headRx * 0.5f, headCy - headRy - h * 0.12f,
+                cx - headRx * 0.5f, headCy - headRy - h * 0.12f,
+                cx - headRx * 0.92f, headCy - headRy * 0.15f
             )
             close()
         }
-        drawPath(bangsPath, hairLight)
+        drawPath(bangsPath, hairSilver)
 
-        // Side hair strands (left)
+        // Lighter streaks in bangs
+        drawLine(hairLight, Offset(cx - headRx * 0.5f, headCy - headRy * 0.4f),
+            Offset(cx - headRx * 0.55f, headCy + headRy * 0.05f), strokeWidth = 2f, cap = StrokeCap.Round)
+        drawLine(hairLight, Offset(cx + headRx * 0.3f, headCy - headRy * 0.35f),
+            Offset(cx + headRx * 0.25f, headCy + headRy * 0.1f), strokeWidth = 2f, cap = StrokeCap.Round)
+
+        // Side hair strands (left — flowing down)
         val leftHairPath = Path().apply {
-            moveTo(cx - headRx * 0.9f, headCy - headRy * 0.1f)
+            moveTo(cx - headRx * 0.88f, headCy - headRy * 0.1f)
             cubicTo(
-                cx - headRx - w * 0.08f, headCy + headRy * 0.6f,
-                cx - headRx - w * 0.04f, h * 0.7f,
-                cx - headRx + w * 0.02f, h * 0.72f
+                cx - headRx - w * 0.08f, headCy + headRy * 0.5f,
+                cx - headRx - w * 0.05f, h * 0.68f,
+                cx - headRx + w * 0.03f, h * 0.78f
             )
-            lineTo(cx - headRx + w * 0.08f, headCy + headRy * 0.3f)
+            lineTo(cx - headRx + w * 0.10f, headCy + headRy * 0.4f)
             close()
         }
-        drawPath(leftHairPath, hairDark)
+        drawPath(leftHairPath, hairSilver)
 
-        // Side hair strands (right)
+        // Side hair strands (right — flowing down)
         val rightHairPath = Path().apply {
-            moveTo(cx + headRx * 0.9f, headCy - headRy * 0.1f)
+            moveTo(cx + headRx * 0.88f, headCy - headRy * 0.1f)
             cubicTo(
-                cx + headRx + w * 0.08f, headCy + headRy * 0.6f,
-                cx + headRx + w * 0.04f, h * 0.7f,
-                cx + headRx - w * 0.02f, h * 0.72f
+                cx + headRx + w * 0.08f, headCy + headRy * 0.5f,
+                cx + headRx + w * 0.05f, h * 0.68f,
+                cx + headRx - w * 0.03f, h * 0.78f
             )
-            lineTo(cx + headRx - w * 0.08f, headCy + headRy * 0.3f)
+            lineTo(cx + headRx - w * 0.10f, headCy + headRy * 0.4f)
             close()
         }
-        drawPath(rightHairPath, hairDark)
+        drawPath(rightHairPath, hairSilver)
 
-        // ── Eyes ──
+        // ─── Red Ribbon hair ties (on each side) ────────────────────
+        val ribbonY = headCy + headRy * 0.15f
+
+        // Left ribbon
+        drawRibbonTie(cx - headRx * 0.82f, ribbonY, w * 0.06f, ribbonRed, ribbonDark)
+        // Right ribbon
+        drawRibbonTie(cx + headRx * 0.82f, ribbonY, w * 0.06f, ribbonRed, ribbonDark)
+
+        // ─── Eyes (big detailed anime eyes) ─────────────────────────
         val eyeY = headCy + headRy * 0.08f
-        val eyeSpacing = headRx * 0.42f
-        val eyeW = w * 0.09f
-        val eyeH = h * 0.08f
+        val eyeSpacing = headRx * 0.40f
+        val eyeW = w * 0.095f
+        val eyeH = h * 0.085f
 
-        // Left eye
-        drawEye(cx - eyeSpacing, eyeY, eyeW, eyeH, eyeBlue, eyeLight, white, black)
-        // Right eye
-        drawEye(cx + eyeSpacing, eyeY, eyeW, eyeH, eyeBlue, eyeLight, white, black)
+        drawAnimeEye(cx - eyeSpacing, eyeY, eyeW, eyeH, eyeBlue, eyeLight, eyeDark, white, black)
+        drawAnimeEye(cx + eyeSpacing, eyeY, eyeW, eyeH, eyeBlue, eyeLight, eyeDark, white, black)
 
-        // Eyelashes (small lines above eyes)
-        drawLine(black, Offset(cx - eyeSpacing - eyeW * 0.7f, eyeY - eyeH * 0.8f),
-            Offset(cx - eyeSpacing - eyeW * 0.3f, eyeY - eyeH * 1.1f), strokeWidth = 1.5f, cap = StrokeCap.Round)
-        drawLine(black, Offset(cx + eyeSpacing + eyeW * 0.7f, eyeY - eyeH * 0.8f),
-            Offset(cx + eyeSpacing + eyeW * 0.3f, eyeY - eyeH * 1.1f), strokeWidth = 1.5f, cap = StrokeCap.Round)
+        // Upper eyelid lines (thicker, expressive)
+        drawArc(black, startAngle = 200f, sweepAngle = 140f, useCenter = false,
+            topLeft = Offset(cx - eyeSpacing - eyeW * 1.1f, eyeY - eyeH * 1.2f),
+            size = Size(eyeW * 2.2f, eyeH * 1.6f),
+            style = Stroke(width = 2.5f, cap = StrokeCap.Round))
+        drawArc(black, startAngle = 200f, sweepAngle = 140f, useCenter = false,
+            topLeft = Offset(cx + eyeSpacing - eyeW * 1.1f, eyeY - eyeH * 1.2f),
+            size = Size(eyeW * 2.2f, eyeH * 1.6f),
+            style = Stroke(width = 2.5f, cap = StrokeCap.Round))
 
-        // ── Eyebrows ──
-        drawLine(hairDark, Offset(cx - eyeSpacing - eyeW * 0.5f, eyeY - eyeH * 1.4f),
-            Offset(cx - eyeSpacing + eyeW * 0.5f, eyeY - eyeH * 1.5f), strokeWidth = 2f, cap = StrokeCap.Round)
-        drawLine(hairDark, Offset(cx + eyeSpacing - eyeW * 0.5f, eyeY - eyeH * 1.5f),
-            Offset(cx + eyeSpacing + eyeW * 0.5f, eyeY - eyeH * 1.4f), strokeWidth = 2f, cap = StrokeCap.Round)
+        // Eyelashes
+        drawLine(black, Offset(cx - eyeSpacing - eyeW * 0.9f, eyeY - eyeH * 0.7f),
+            Offset(cx - eyeSpacing - eyeW * 1.1f, eyeY - eyeH * 1.2f), strokeWidth = 1.5f, cap = StrokeCap.Round)
+        drawLine(black, Offset(cx + eyeSpacing + eyeW * 0.9f, eyeY - eyeH * 0.7f),
+            Offset(cx + eyeSpacing + eyeW * 1.1f, eyeY - eyeH * 1.2f), strokeWidth = 1.5f, cap = StrokeCap.Round)
 
-        // ── Nose (tiny dot) ──
-        drawCircle(skinShadow, radius = w * 0.012f, center = Offset(cx, eyeY + eyeH * 1.1f))
+        // ─── Eyebrows (subtle, through bangs) ───────────────────────
+        drawLine(hairShadow, Offset(cx - eyeSpacing - eyeW * 0.4f, eyeY - eyeH * 1.6f),
+            Offset(cx - eyeSpacing + eyeW * 0.5f, eyeY - eyeH * 1.7f), strokeWidth = 2f, cap = StrokeCap.Round)
+        drawLine(hairShadow, Offset(cx + eyeSpacing - eyeW * 0.5f, eyeY - eyeH * 1.7f),
+            Offset(cx + eyeSpacing + eyeW * 0.4f, eyeY - eyeH * 1.6f), strokeWidth = 2f, cap = StrokeCap.Round)
 
-        // ── Mouth (small smile) ──
+        // ─── Nose (tiny mark) ───────────────────────────────────────
+        drawCircle(skinShadow, radius = w * 0.011f, center = Offset(cx, eyeY + eyeH * 1.2f))
+
+        // ─── Mouth (small closed mouth, slightly pouty) ─────────────
+        drawLine(Color(0xFFD08080), Offset(cx - w * 0.025f, eyeY + eyeH * 1.8f),
+            Offset(cx + w * 0.025f, eyeY + eyeH * 1.8f), strokeWidth = 2f, cap = StrokeCap.Round)
+        // Slight curve down (pouty)
         drawArc(
-            Color(0xFFE57373),
-            startAngle = 10f, sweepAngle = 160f, useCenter = false,
-            topLeft = Offset(cx - w * 0.04f, eyeY + eyeH * 1.5f),
-            size = Size(w * 0.08f, h * 0.035f),
-            style = Stroke(width = 2f, cap = StrokeCap.Round)
+            Color(0xFFD08080),
+            startAngle = 0f, sweepAngle = 180f, useCenter = false,
+            topLeft = Offset(cx - w * 0.02f, eyeY + eyeH * 1.75f),
+            size = Size(w * 0.04f, h * 0.015f),
+            style = Stroke(width = 1.5f, cap = StrokeCap.Round)
         )
 
-        // ── Blush circles ──
-        drawCircle(blush.copy(alpha = 0.3f), radius = w * 0.05f,
-            center = Offset(cx - eyeSpacing - w * 0.03f, eyeY + eyeH * 0.9f))
-        drawCircle(blush.copy(alpha = 0.3f), radius = w * 0.05f,
-            center = Offset(cx + eyeSpacing + w * 0.03f, eyeY + eyeH * 0.9f))
+        // ─── Blush (hatching lines style) ───────────────────────────
+        val blushY = eyeY + eyeH * 0.7f
+        // Left blush — diagonal lines
+        for (i in 0..3) {
+            val bx = cx - eyeSpacing - w * 0.04f + i * w * 0.022f
+            drawLine(blush.copy(alpha = 0.45f),
+                Offset(bx, blushY - h * 0.012f),
+                Offset(bx + w * 0.01f, blushY + h * 0.012f),
+                strokeWidth = 1.5f, cap = StrokeCap.Round)
+        }
+        // Right blush
+        for (i in 0..3) {
+            val bx = cx + eyeSpacing - w * 0.01f + i * w * 0.022f
+            drawLine(blush.copy(alpha = 0.45f),
+                Offset(bx, blushY - h * 0.012f),
+                Offset(bx + w * 0.01f, blushY + h * 0.012f),
+                strokeWidth = 1.5f, cap = StrokeCap.Round)
+        }
 
-        // ── Hair accessory (star clip on left) ──
-        drawStar(cx - headRx * 0.75f, headCy - headRy * 0.55f, w * 0.04f, Color(0xFFFFD700), Color(0xFFFFF176))
-
-        // ── Sparkles around ──
-        drawSparkle(w * 0.08f, h * 0.15f, w * 0.015f, Color(0xFFFFD700).copy(alpha = 0.7f))
-        drawSparkle(w * 0.92f, h * 0.2f, w * 0.012f, Color(0xFF5B9BD5).copy(alpha = 0.6f))
-        drawSparkle(w * 0.85f, h * 0.08f, w * 0.01f, Color(0xFFFFD700).copy(alpha = 0.5f))
+        // ─── Sparkles ───────────────────────────────────────────────
+        drawSparkle(w * 0.10f, h * 0.12f, w * 0.014f, Color(0xFFFFD700).copy(alpha = 0.7f))
+        drawSparkle(w * 0.90f, h * 0.18f, w * 0.012f, Color(0xFF90C0E8).copy(alpha = 0.6f))
+        drawSparkle(w * 0.86f, h * 0.06f, w * 0.010f, Color(0xFFFFD700).copy(alpha = 0.5f))
     }
 }
 
-private fun DrawScope.drawEye(
+private fun DrawScope.drawAnimeEye(
     cx: Float, cy: Float, w: Float, h: Float,
-    irisColor: Color, irisLight: Color, white: Color, black: Color
+    irisColor: Color, irisLight: Color, irisDark: Color,
+    white: Color, black: Color
 ) {
-    // Eye white (oval)
+    // Eye white (slightly tall oval)
     drawOval(white, topLeft = Offset(cx - w, cy - h), size = Size(w * 2, h * 2))
-    // Outer eye line
-    drawOval(black, topLeft = Offset(cx - w, cy - h), size = Size(w * 2, h * 2),
+
+    // Iris — large relative to eye
+    val irisR = w * 0.75f
+    drawCircle(irisColor, radius = irisR, center = Offset(cx, cy + h * 0.08f))
+
+    // Iris ring
+    drawCircle(irisDark, radius = irisR, center = Offset(cx, cy + h * 0.08f),
         style = Stroke(width = 1.5f))
-    // Iris
-    drawCircle(irisColor, radius = w * 0.7f, center = Offset(cx, cy + h * 0.1f))
-    // Iris gradient highlight (lighter inner)
-    drawCircle(irisLight, radius = w * 0.4f, center = Offset(cx - w * 0.1f, cy))
+
+    // Inner gradient: lighter center top
+    drawCircle(irisLight, radius = irisR * 0.5f, center = Offset(cx - w * 0.08f, cy - h * 0.05f))
+
     // Pupil
-    drawCircle(black, radius = w * 0.3f, center = Offset(cx, cy + h * 0.15f))
-    // Main highlight
-    drawCircle(white, radius = w * 0.22f, center = Offset(cx - w * 0.2f, cy - h * 0.25f))
-    // Small secondary highlight
-    drawCircle(white, radius = w * 0.1f, center = Offset(cx + w * 0.25f, cy + h * 0.3f))
+    drawCircle(black, radius = w * 0.3f, center = Offset(cx, cy + h * 0.12f))
+
+    // Main highlight (large, upper-left)
+    drawCircle(white, radius = w * 0.25f, center = Offset(cx - w * 0.22f, cy - h * 0.3f))
+
+    // Secondary highlight (small, lower-right)
+    drawCircle(white, radius = w * 0.10f, center = Offset(cx + w * 0.25f, cy + h * 0.25f))
+
+    // Tiny third highlight
+    drawCircle(white.copy(alpha = 0.7f), radius = w * 0.06f,
+        center = Offset(cx - w * 0.35f, cy + h * 0.15f))
 }
 
-private fun DrawScope.drawStar(cx: Float, cy: Float, r: Float, outer: Color, inner: Color) {
-    val path = Path()
-    for (i in 0 until 10) {
-        val angle = (PI / 2 + i * PI / 5).toFloat()
-        val rad = if (i % 2 == 0) r else r * 0.45f
-        val x = cx + cos(angle) * rad
-        val y = cy - sin(angle) * rad
-        if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+private fun DrawScope.drawRibbonTie(cx: Float, cy: Float, size: Float, color: Color, dark: Color) {
+    // Left ribbon wing
+    val left = Path().apply {
+        moveTo(cx, cy)
+        cubicTo(cx - size * 1.2f, cy - size * 0.8f,
+            cx - size * 1.5f, cy + size * 0.2f,
+            cx - size * 0.3f, cy + size * 0.5f)
+        close()
     }
-    path.close()
-    drawPath(path, outer)
-    drawCircle(inner, radius = r * 0.3f, center = Offset(cx, cy))
+    drawPath(left, color)
+
+    // Right ribbon wing
+    val right = Path().apply {
+        moveTo(cx, cy)
+        cubicTo(cx + size * 0.8f, cy - size * 0.6f,
+            cx + size * 1.2f, cy + size * 0.4f,
+            cx + size * 0.2f, cy + size * 0.5f)
+        close()
+    }
+    drawPath(right, color)
+
+    // Trailing ribbon tails
+    val tailLeft = Path().apply {
+        moveTo(cx - size * 0.2f, cy + size * 0.3f)
+        cubicTo(cx - size * 0.8f, cy + size * 1.2f,
+            cx - size * 0.4f, cy + size * 1.5f,
+            cx - size * 0.5f, cy + size * 1.8f)
+    }
+    drawPath(tailLeft, dark, style = Stroke(width = size * 0.2f, cap = StrokeCap.Round))
+
+    val tailRight = Path().apply {
+        moveTo(cx + size * 0.1f, cy + size * 0.3f)
+        cubicTo(cx + size * 0.5f, cy + size * 1.0f,
+            cx + size * 0.3f, cy + size * 1.5f,
+            cx + size * 0.4f, cy + size * 1.8f)
+    }
+    drawPath(tailRight, dark, style = Stroke(width = size * 0.2f, cap = StrokeCap.Round))
+
+    // Center knot
+    drawCircle(dark, radius = size * 0.2f, center = Offset(cx, cy + size * 0.1f))
 }
 
 private fun DrawScope.drawSparkle(cx: Float, cy: Float, r: Float, color: Color) {
-    // 4-pointed sparkle
     drawLine(color, Offset(cx, cy - r * 1.5f), Offset(cx, cy + r * 1.5f), strokeWidth = 1.5f, cap = StrokeCap.Round)
     drawLine(color, Offset(cx - r * 1.5f, cy), Offset(cx + r * 1.5f, cy), strokeWidth = 1.5f, cap = StrokeCap.Round)
     drawLine(color, Offset(cx - r, cy - r), Offset(cx + r, cy + r), strokeWidth = 1f, cap = StrokeCap.Round)

@@ -12,7 +12,7 @@ import com.finora.data.repository.FinanceRepository
 /** Manual dependency container — created once in [com.finora.FinoraApp]. */
 class AppContainer(context: Context) {
 
-    private val database: AppDatabase = Room.databaseBuilder(
+    val db: AppDatabase = Room.databaseBuilder(
         context.applicationContext,
         AppDatabase::class.java,
         AppDatabase.NAME
@@ -25,7 +25,7 @@ class AppContainer(context: Context) {
         )
         .build()
 
-    val repository: FinanceRepository = FinanceRepository(database)
+    val repository: FinanceRepository = FinanceRepository(db)
 
     val settings: SettingsRepository = SettingsRepository(context.applicationContext)
 
@@ -35,5 +35,5 @@ class AppContainer(context: Context) {
 
     val authRepository: AuthRepository = AuthRepository(supabaseClient)
 
-    val syncManager: SyncManager = SyncManager(supabaseClient, database)
+    val syncManager: SyncManager = SyncManager(supabaseClient, db)
 }

@@ -21,7 +21,7 @@ class MainActivity : ComponentActivity() {
         val settings = (application as FinoraApp).container.settings
         setContent {
             val themeMode by settings.themeMode.collectAsStateWithLifecycle(initialValue = ThemeMode.SYSTEM)
-            val accent by settings.accentColor.collectAsStateWithLifecycle(initialValue = AccentColor.VIOLET)
+            val accent by settings.accentColor.collectAsStateWithLifecycle(initialValue = AccentColor.BLUE)
             val darkTheme = when (themeMode) {
                 ThemeMode.LIGHT -> false
                 ThemeMode.DARK -> true

@@ -62,6 +62,9 @@ import com.finora.domain.model.Goal
 import com.finora.domain.model.GoalAccountSummary
 import com.finora.presentation.AppViewModelProvider
 import com.finora.presentation.components.ColorPickerRow
+import com.finora.presentation.guide.GuideStep
+import com.finora.presentation.guide.LocalGuideController
+import com.finora.presentation.guide.guideTarget
 import com.finora.presentation.components.EmptyState
 import com.finora.presentation.components.FinoraCard
 import com.finora.presentation.components.IconChip
@@ -80,6 +83,7 @@ fun GoalsScreen(
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()
     var showNewGoalDialog by remember { mutableStateOf(false) }
     var detailGoalId by remember { mutableStateOf<Long?>(null) }
+    val guideController = LocalGuideController.current
 
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
@@ -89,6 +93,7 @@ fun GoalsScreen(
         item {
             SectionHeader(
                 title = "Цели",
+                modifier = Modifier.guideTarget(guideController, GuideStep.GOALS_CREATE),
                 action = {
                     FilledTonalButton(onClick = { showNewGoalDialog = true }) {
                         Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))

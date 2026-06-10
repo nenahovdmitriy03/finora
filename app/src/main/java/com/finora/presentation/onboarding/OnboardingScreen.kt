@@ -11,6 +11,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -66,8 +67,8 @@ private data class OnboardingPage(
 private val pages = listOf(
     OnboardingPage(
         title = "Добро пожаловать\nв Finora!",
-        subtitle = "Ваш личный финансовый помощник.\nПростой учёт денег, который работает.",
-        accentColors = listOf(Color(0xFF6C5CE7), Color(0xFF8B7CF7))
+        subtitle = "Привет! Я твой финансовый помощник.\nПомогу вести учёт легко и красиво!",
+        accentColors = listOf(Color(0xFF3A7BD5), Color(0xFF5B9BD5))
     ),
     OnboardingPage(
         title = "Учёт финансов\nбез лишнего",
@@ -216,14 +217,24 @@ private fun OnboardingPageContent(page: OnboardingPage, pageIndex: Int) {
                 .padding(16.dp),
             contentAlignment = Alignment.Center
         ) {
-            Canvas(
-                modifier = Modifier
-                    .size(240.dp)
-            ) {
-                when (pageIndex) {
-                    0 -> drawWelcomeIllustration(page.accentColors, floatOffset)
-                    1 -> drawFinanceIllustration(page.accentColors, floatOffset)
-                    2 -> drawGoalsIllustration(page.accentColors, floatOffset)
+            if (pageIndex == 0) {
+                // Mascot girl on welcome page
+                Box(
+                    modifier = Modifier.size(200.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    com.finora.presentation.guide.MascotGirl(
+                        modifier = Modifier
+                            .size(180.dp)
+                            .graphicsLayer { translationY = floatOffset }
+                    )
+                }
+            } else {
+                Canvas(modifier = Modifier.size(240.dp)) {
+                    when (pageIndex) {
+                        1 -> drawFinanceIllustration(page.accentColors, floatOffset)
+                        2 -> drawGoalsIllustration(page.accentColors, floatOffset)
+                    }
                 }
             }
         }

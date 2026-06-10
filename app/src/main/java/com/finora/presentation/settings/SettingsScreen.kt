@@ -147,7 +147,11 @@ fun SettingsScreen(
         }
 
         item { SectionHeader(title = "Внешний вид") }
-        item { ThemeSelector(selected = themeMode, onSelect = viewModel::setTheme) }
+        item {
+            Box(modifier = Modifier.guideTarget(guideController, GuideStep.SETTINGS_THEME)) {
+                ThemeSelector(selected = themeMode, onSelect = viewModel::setTheme)
+            }
+        }
 
         item { SectionHeader(title = "Цвет акцента") }
         item {

@@ -30,35 +30,47 @@ data class AiInsightUiState(
  */
 class AiInsightViewModel(
     private val repository: FinanceRepository,
-    private val engine: AiEngine? = AiProviders.firstConfigured()
+    private val engines: List<AiEngine> = AiProviders.configured()
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(
-        AiInsightUiState(configured = engine != null, provider = engine?.label)
+        AiInsightUiState(configured = engines.isNotEmpty(), provider = engines.firstOrNull()?.label)
     )
     val state: StateFlow<AiInsightUiState> = _state.asStateFlow()
 
     fun analyze() {
         if (_state.value.loading) return
-        val active = engine
-        if (active == null) {
+        if (engines.isEmpty()) {
             _state.update { it.copy(configured = false) }
             return
         }
         viewModelScope.launch {
             _state.update { it.copy(loading = true, error = null) }
-            try {
-                val prompt = buildPrompt()
-                val text = active.generate(prompt)
-                _state.update {
-                    it.copy(
-                        loading = false,
-                        insight = text.ifBlank { "Модель вернула пустой ответ. Попробуй ещё раз." }
-                    )
+            val prompt = buildPrompt()
+            val errors = mutableListOf<String>()
+            // Try each configured provider in turn; first success wins.
+            for (engine in engines) {
+                try {
+                    val text = engine.generate(prompt)
+                    _state.update {
+                        it.copy(
+                            loading = false,
+                            provider = engine.label,
+                            error = null,
+                            insight = text.ifBlank { "Модель вернула пустой ответ. Попробуй ещё раз." }
+                        )
+                    }
+                    return@launch
+                } catch (e: Exception) {
+                    errors += "${engine.label}: ${e.message ?: "ошибка"}"
                 }
-            } catch (e: Exception) {
-                _state.update { it.copy(loading = false, error = e.message ?: "Не удалось получить ответ") }
             }
+            val combined = if (errors.size > 1) {
+                "Все провайдеры недоступны.\n" + errors.joinToString("\n")
+            } else {
+                errors.firstOrNull() ?: "Не удалось получить ответ"
+            }
+            _state.update { it.copy(loading = false, error = combined) }
         }
     }
 

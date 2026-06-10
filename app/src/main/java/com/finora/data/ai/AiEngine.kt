@@ -20,18 +20,28 @@ object AiProviders {
         OpenAiCompatClient(
             apiKey = BuildConfig.OPENROUTER_API_KEY,
             baseUrl = "https://openrouter.ai/api/v1",
-            model = "meta-llama/llama-3.3-70b-instruct:free",
+            // Several free models — if one is rate-limited (429), the next is tried.
+            models = listOf(
+                "meta-llama/llama-3.3-70b-instruct:free",
+                "deepseek/deepseek-chat-v3-0324:free",
+                "google/gemini-2.0-flash-exp:free",
+                "qwen/qwen-2.5-72b-instruct:free",
+                "mistralai/mistral-small-3.1-24b-instruct:free"
+            ),
             label = "OpenRouter"
         ),
         OpenAiCompatClient(
             apiKey = BuildConfig.GROQ_API_KEY,
             baseUrl = "https://api.groq.com/openai/v1",
-            model = "llama-3.3-70b-versatile",
+            models = listOf("llama-3.3-70b-versatile", "llama-3.1-8b-instant"),
             label = "Groq"
         ),
         GeminiClient()
     )
 
+    /** Every provider that has a key configured, in priority order. */
+    fun configured(): List<AiEngine> = all().filter { it.isConfigured }
+
     /** First provider that has a key configured, or null if none. */
-    fun firstConfigured(): AiEngine? = all().firstOrNull { it.isConfigured }
+    fun firstConfigured(): AiEngine? = configured().firstOrNull()
 }

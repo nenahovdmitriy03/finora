@@ -16,13 +16,34 @@ import java.net.URL
 class OpenAiCompatClient(
     private val apiKey: String,
     private val baseUrl: String,
-    private val model: String,
+    /** Models tried in order; on rate-limit/5xx errors the next one is attempted. */
+    private val models: List<String>,
     override val label: String
 ) : AiEngine {
 
+    constructor(apiKey: String, baseUrl: String, model: String, label: String) :
+        this(apiKey, baseUrl, listOf(model), label)
+
     override val isConfigured: Boolean get() = apiKey.isNotBlank()
 
-    override suspend fun generate(prompt: String): String = withContext(Dispatchers.IO) {
+    override suspend fun generate(prompt: String): String {
+        var lastError: Exception? = null
+        for (model in models) {
+            try {
+                return requestOnce(prompt, model)
+            } catch (e: Exception) {
+                lastError = e
+                // Only fall through to the next model on transient/limit errors.
+                val msg = e.message.orEmpty()
+                val transient = msg.contains("HTTP 429") || msg.contains("HTTP 5") ||
+                    msg.contains("rate", ignoreCase = true) || msg.contains("quota", ignoreCase = true)
+                if (!transient) throw e
+            }
+        }
+        throw lastError ?: IOException("Не удалось получить ответ")
+    }
+
+    private suspend fun requestOnce(prompt: String, model: String): String = withContext(Dispatchers.IO) {
         val url = URL("${baseUrl.trimEnd('/')}/chat/completions")
         val conn = (url.openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"

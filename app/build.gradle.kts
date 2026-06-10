@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 // AI keys are read from local.properties (NOT committed). Add any of:
@@ -32,6 +33,10 @@ android {
         buildConfigField("String", "GEMINI_API_KEY", "\"${secret("GEMINI_API_KEY")}\"")
         buildConfigField("String", "OPENROUTER_API_KEY", "\"${secret("OPENROUTER_API_KEY")}\"")
         buildConfigField("String", "GROQ_API_KEY", "\"${secret("GROQ_API_KEY")}\"")
+
+        // Supabase (public client credentials — safe to embed)
+        buildConfigField("String", "SUPABASE_URL", "\"https://krjmutiniswmrvpfugec.supabase.co\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"${secret("SUPABASE_ANON_KEY").ifEmpty { "sb_publishable_uO1JphgxNAoUocMP5smFsw_TuYmnxtu" }}\"")
     }
 
     buildTypes {
@@ -87,6 +92,13 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
 
     implementation(libs.generativeai)
+
+    // Supabase
+    implementation(platform(libs.supabase.bom))
+    implementation(libs.supabase.postgrest)
+    implementation(libs.supabase.auth)
+    implementation(libs.ktor.client.android)
+    implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

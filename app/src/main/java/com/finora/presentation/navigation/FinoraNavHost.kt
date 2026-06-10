@@ -17,10 +17,12 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -30,9 +32,15 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.finora.data.remote.AuthRepository
+import com.finora.data.remote.SupabaseModule
+import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.auth.status.SessionStatus
+import kotlinx.coroutines.flow.map
 import com.finora.presentation.accounts.AccountsScreen
 import com.finora.presentation.addtransaction.AddTransactionScreen
 import com.finora.presentation.ai.AiChatScreen
+import com.finora.presentation.auth.AuthScreen
 import com.finora.presentation.goals.GoalsScreen
 import com.finora.presentation.home.HomeScreen
 import com.finora.presentation.settings.SettingsScreen
@@ -42,6 +50,32 @@ import com.finora.presentation.transactions.TransactionsScreen
 fun FinoraNavHost(navController: NavHostController = rememberNavController()) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+
+    // Observe auth state to handle navigation between auth and main screens
+    val sessionStatus by SupabaseModule.client.auth.sessionStatus
+        .collectAsStateWithLifecycle(initialValue = SessionStatus.LoadingFromStorage)
+
+    // Navigate based on auth state changes
+    LaunchedEffect(sessionStatus) {
+        when (sessionStatus) {
+            is SessionStatus.Authenticated -> {
+                if (currentRoute == Destination.Auth.route) {
+                    navController.navigate(Destination.Home.route) {
+                        popUpTo(Destination.Auth.route) { inclusive = true }
+                    }
+                }
+            }
+            is SessionStatus.NotAuthenticated -> {
+                if (currentRoute != Destination.Auth.route) {
+                    navController.navigate(Destination.Auth.route) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }
+            }
+            else -> {} // Loading — do nothing
+        }
+    }
+
     val showBars = currentRoute in bottomItems.map { it.destination.route }
 
     Scaffold(
@@ -73,11 +107,18 @@ fun FinoraNavHost(navController: NavHostController = rememberNavController()) {
             }
         }
     ) { innerPadding ->
+        // Start destination depends on whether we have a session
+        val startDest = if (sessionStatus is SessionStatus.Authenticated)
+            Destination.Home.route else Destination.Auth.route
+
         NavHost(
             navController = navController,
-            startDestination = Destination.Home.route,
+            startDestination = startDest,
             modifier = Modifier.padding(innerPadding)
         ) {
+            composable(Destination.Auth.route) {
+                AuthScreen()
+            }
             composable(Destination.Home.route) {
                 HomeScreen(
                     onAddTransaction = { navController.navigate(Destination.AddTransaction.create()) },
@@ -151,8 +192,6 @@ private fun FinoraBottomBar(
                 icon = { Icon(item.icon, contentDescription = item.label) },
                 label = { Text(item.label, style = MaterialTheme.typography.labelMedium) },
                 colors = NavigationBarItemDefaults.colors(
-                    // icon sits ON the indicator pill → use the on-container color so it
-                    // stays readable for every accent (fixes the icon being hidden by the color)
                     selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
                     selectedTextColor = MaterialTheme.colorScheme.onSurface,
                     indicatorColor = MaterialTheme.colorScheme.primaryContainer,

@@ -4,6 +4,9 @@ import android.content.Context
 import androidx.room.Room
 import com.finora.data.local.AppDatabase
 import com.finora.data.preferences.SettingsRepository
+import com.finora.data.remote.AuthRepository
+import com.finora.data.remote.SupabaseModule
+import com.finora.data.remote.SyncManager
 import com.finora.data.repository.FinanceRepository
 
 /** Manual dependency container — created once in [com.finora.FinoraApp]. */
@@ -25,4 +28,12 @@ class AppContainer(context: Context) {
     val repository: FinanceRepository = FinanceRepository(database)
 
     val settings: SettingsRepository = SettingsRepository(context.applicationContext)
+
+    // ─── Supabase ────────────────────────────────────────────────────────
+
+    private val supabaseClient = SupabaseModule.client
+
+    val authRepository: AuthRepository = AuthRepository(supabaseClient)
+
+    val syncManager: SyncManager = SyncManager(supabaseClient, database)
 }

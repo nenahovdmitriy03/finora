@@ -19,10 +19,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material.icons.rounded.AccountBalanceWallet
+import androidx.compose.material.icons.rounded.CloudDownload
+import androidx.compose.material.icons.rounded.CloudUpload
 import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.LightMode
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.SettingsBrightness
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -40,6 +45,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.rounded.Check
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.finora.data.remote.AuthRepository
 import com.finora.domain.model.AccentColor
 import com.finora.domain.model.ThemeMode
 import com.finora.presentation.AppViewModelProvider
@@ -53,6 +59,8 @@ fun SettingsScreen(
 ) {
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val accent by viewModel.accentColor.collectAsStateWithLifecycle()
+    val authState by viewModel.authState.collectAsStateWithLifecycle()
+    val syncStatus by viewModel.syncStatus.collectAsStateWithLifecycle()
 
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
@@ -65,6 +73,68 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.onBackground
             )
+        }
+
+        // ─── Account section ─────────────────────────────────────────────
+        item { SectionHeader(title = "Аккаунт") }
+        item {
+            val auth = authState
+            if (auth is AuthRepository.AuthState.Authenticated) {
+                FinoraCard(padding = PaddingValues(0.dp)) {
+                    Column {
+                        SettingRow(
+                            icon = Icons.Rounded.Person,
+                            title = auth.email ?: "Пользователь",
+                            subtitle = "Вы вошли в аккаунт",
+                            onClick = {}
+                        )
+                        // Sync to cloud
+                        SettingRow(
+                            icon = Icons.Rounded.CloudUpload,
+                            title = "Сохранить в облако",
+                            subtitle = when (syncStatus) {
+                                is SettingsViewModel.SyncStatus.Syncing -> "Синхронизация..."
+                                is SettingsViewModel.SyncStatus.Success -> "Данные сохранены ✓"
+                                is SettingsViewModel.SyncStatus.Error ->
+                                    (syncStatus as SettingsViewModel.SyncStatus.Error).message
+                                else -> "Загрузить все данные в Supabase"
+                            },
+                            onClick = viewModel::syncToCloud,
+                            trailing = {
+                                if (syncStatus is SettingsViewModel.SyncStatus.Syncing) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                }
+                            }
+                        )
+                        // Restore from cloud
+                        SettingRow(
+                            icon = Icons.Rounded.CloudDownload,
+                            title = "Восстановить из облака",
+                            subtitle = "Загрузить данные с сервера",
+                            onClick = viewModel::restoreFromCloud
+                        )
+                        // Logout
+                        SettingRow(
+                            icon = Icons.AutoMirrored.Rounded.Logout,
+                            title = "Выйти",
+                            subtitle = "Выйти из аккаунта",
+                            onClick = viewModel::signOut,
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            } else {
+                FinoraCard {
+                    Text(
+                        "Войдите в аккаунт для синхронизации данных",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
 
         item { SectionHeader(title = "Внешний вид") }
@@ -216,7 +286,9 @@ private fun SettingRow(
     icon: ImageVector,
     title: String,
     subtitle: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    tint: Color = MaterialTheme.colorScheme.primary,
+    trailing: @Composable (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
@@ -230,20 +302,24 @@ private fun SettingRow(
             modifier = Modifier
                 .size(44.dp)
                 .clip(RoundedCornerShape(14.dp))
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                .background(tint.copy(alpha = 0.14f)),
             contentAlignment = Alignment.Center
         ) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Icon(icon, contentDescription = null, tint = tint)
         }
         Spacer(Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
             Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Icon(
-            Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        if (trailing != null) {
+            trailing()
+        } else {
+            Icon(
+                Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }

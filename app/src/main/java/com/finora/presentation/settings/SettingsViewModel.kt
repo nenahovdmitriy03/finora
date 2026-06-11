@@ -75,6 +75,12 @@ class SettingsViewModel(
             } catch (_: Exception) { }
             authRepo.signOut()
             settings.clearOnboardingFlags()
+            settings.clearDataOwnerId()
+            // Wipe local data so the next account that logs in starts clean
+            // and the previous user's data can't leak across accounts.
+            try {
+                syncManager.clearLocalData()
+            } catch (_: Exception) { }
             _isSigningOut.value = false
         }
     }
@@ -88,6 +94,7 @@ class SettingsViewModel(
                 syncManager.deleteAllUserData(userId)
                 authRepo.signOut()
                 settings.clearOnboardingFlags()
+                settings.clearDataOwnerId()
                 _deleteStatus.value = DeleteStatus.Done
             } catch (e: Exception) {
                 _deleteStatus.value = DeleteStatus.Error(e.message ?: "Ошибка удаления")

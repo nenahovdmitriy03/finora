@@ -10,6 +10,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.finora.domain.model.AccentColor
 import com.finora.domain.model.ThemeMode
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "finora_settings")
@@ -21,6 +22,8 @@ class SettingsRepository(context: Context) {
     private val themeKey = stringPreferencesKey("theme_mode")
     private val accentKey = stringPreferencesKey("accent_color")
     private val aiSessionKey = stringPreferencesKey("ai_chat_session")
+    /** The user id whose data currently lives in the local Room DB. */
+    private val dataOwnerKey = stringPreferencesKey("data_owner_id")
 
     // ─── Onboarding / guide flags ────────────────────────────────────────
     private val authSkippedKey = booleanPreferencesKey("auth_skipped")
@@ -56,6 +59,25 @@ class SettingsRepository(context: Context) {
 
     suspend fun clearAiChatSession() {
         appContext.dataStore.edit { prefs -> prefs.remove(aiSessionKey) }
+    }
+
+    // ─── Local data owner (multi-account isolation) ──────────────────────
+
+    /**
+     * Returns the user id whose data is currently stored in local Room,
+     * or `null` if the data is "unclaimed" (e.g. a user browsing without an
+     * account). Used to decide whether to wipe local data when a *different*
+     * user logs in, so accounts don't leak data into each other.
+     */
+    suspend fun dataOwnerId(): String? =
+        appContext.dataStore.data.first()[dataOwnerKey]
+
+    suspend fun setDataOwnerId(userId: String) {
+        appContext.dataStore.edit { prefs -> prefs[dataOwnerKey] = userId }
+    }
+
+    suspend fun clearDataOwnerId() {
+        appContext.dataStore.edit { prefs -> prefs.remove(dataOwnerKey) }
     }
 
     // ─── Auth-skip / onboarding / guide ──────────────────────────────────

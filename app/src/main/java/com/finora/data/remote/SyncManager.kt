@@ -2,6 +2,7 @@ package com.finora.data.remote
 
 import android.util.Log
 import com.finora.data.local.AppDatabase
+import com.finora.data.local.DefaultData
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.CoroutineScope
@@ -377,6 +378,23 @@ class SyncManager(
             Log.d(TAG, "downloadAll DONE: wrote ${remoteAccounts.size} accounts, " +
                     "${remoteCategories.size} categories, ${remoteTransactions.size} tx")
             return@withContext true
+        }
+    }
+
+    // ─── Clear local only ────────────────────────────────────────────────
+
+    /**
+     * Wipes the local Room DB (used when a *different* account logs in, so the
+     * previous user's data doesn't leak). Re-seeds default categories so the
+     * app remains usable. Does NOT touch any remote data.
+     */
+    suspend fun clearLocalData() = syncMutex.withLock {
+        withContext(Dispatchers.IO) {
+            Log.d(TAG, "clearLocalData: wiping local Room")
+            db.clearAllTables()
+            if (db.categoryDao().count() == 0) {
+                db.categoryDao().insertAll(DefaultData.categories())
+            }
         }
     }
 

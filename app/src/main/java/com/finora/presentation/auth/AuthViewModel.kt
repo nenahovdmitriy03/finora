@@ -66,25 +66,38 @@ class AuthViewModel(
                     authRepo.signIn(s.email, s.password)
                     val userId = authRepo.currentUserId()
                     if (userId != null) {
-                        // Step 1: Try to download cloud data
+                        // Who owns the data currently in local Room?
+                        val owner = settings.dataOwnerId()
+                        val switchingAccount = owner != null && owner != userId
+
+                        // If the local data belongs to a DIFFERENT account, wipe it
+                        // first so it can't leak into this account.
+                        if (switchingAccount) {
+                            Log.d("AuthVM", "Different account ($owner → $userId) — clearing local data")
+                            _state.value = _state.value.copy(info = "Подготовка…")
+                            syncManager.clearLocalData()
+                        }
+
+                        // Cloud is the source of truth — always download this user's data.
                         _state.value = _state.value.copy(
                             isLoading = true,
                             info = "Загрузка данных из облака…"
                         )
                         val hadRemoteData = syncManager.downloadAll(userId)
 
-                        if (!hadRemoteData) {
-                            // Step 2: Remote was empty → push local data to cloud.
-                            // This covers:
-                            //   • User registered with email confirmation (upload never ran)
-                            //   • User's cloud data was lost
-                            //   • First login on a device that already has local data
-                            Log.d("AuthVM", "Remote empty after login — uploading local data")
-                            _state.value = _state.value.copy(
-                                info = "Сохранение данных в облако…"
-                            )
+                        if (!hadRemoteData && !switchingAccount) {
+                            // Remote empty AND local data is this user's (or unclaimed,
+                            // e.g. registered with email confirmation / used app without
+                            // an account) → push local data up to claim/back it up.
+                            Log.d("AuthVM", "Remote empty — uploading local data for $userId")
+                            _state.value = _state.value.copy(info = "Сохранение данных в облако…")
                             syncManager.uploadAll(userId)
                         }
+                        // else (switchingAccount && empty remote): genuinely new/empty
+                        // account on this device → keep the clean slate from clearLocalData().
+
+                        // Mark this user as the owner of the local data.
+                        settings.setDataOwnerId(userId)
                     }
                     _state.value = _state.value.copy(isLoading = false, info = null, success = true)
                 } else {
@@ -92,11 +105,17 @@ class AuthViewModel(
                     authRepo.signUp(s.email, s.password)
                     val userId = authRepo.currentUserId()
                     if (userId != null) {
+                        // If local data belonged to another account, wipe before claiming.
+                        val owner = settings.dataOwnerId()
+                        if (owner != null && owner != userId) {
+                            syncManager.clearLocalData()
+                        }
                         _state.value = _state.value.copy(
                             isLoading = true,
                             info = "Сохранение данных в облако…"
                         )
                         syncManager.uploadAll(userId)
+                        settings.setDataOwnerId(userId)
                         _state.value = _state.value.copy(isLoading = false, info = null, success = true)
                     } else {
                         // Email confirmation required — upload will happen on first login

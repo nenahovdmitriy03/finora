@@ -27,6 +27,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -218,17 +221,16 @@ private fun OnboardingPageContent(page: OnboardingPage, pageIndex: Int) {
             contentAlignment = Alignment.Center
         ) {
             if (pageIndex == 0) {
-                // Mascot girl on welcome page
-                Box(
-                    modifier = Modifier.size(200.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    com.finora.presentation.guide.MascotGirl(
-                        modifier = Modifier
-                            .size(width = 200.dp, height = 260.dp)
-                            .graphicsLayer { translationY = floatOffset }
-                    )
-                }
+                // Алия — hero image shown 1:1 on the welcome page
+                Image(
+                    painter = painterResource(id = com.finora.R.drawable.mascot_hero),
+                    contentDescription = "Алия — маскот Finora",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .size(280.dp)
+                        .clip(RoundedCornerShape(28.dp))
+                        .graphicsLayer { translationY = floatOffset }
+                )
             } else {
                 Canvas(modifier = Modifier.size(240.dp)) {
                     when (pageIndex) {

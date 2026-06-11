@@ -115,8 +115,8 @@ class GeminiClient(
     }
 
     companion object {
-        // Free-tier model with vision support.
-        const val DEFAULT_MODEL = "gemini-1.5-flash"
+        // Current free-tier multimodal model (1.5-flash was retired → 404 on v1beta).
+        const val DEFAULT_MODEL = "gemini-2.0-flash"
         private const val MAX_IMAGE_DIM = 1536
     }
 }

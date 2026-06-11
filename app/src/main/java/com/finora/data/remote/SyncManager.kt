@@ -1,5 +1,6 @@
 package com.finora.data.remote
 
+import android.util.Log
 import com.finora.data.local.AppDatabase
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
@@ -36,6 +37,10 @@ class SyncManager(
     /** Scope for debounced background uploads. */
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var pendingUploadJob: Job? = null
+
+    companion object {
+        private const val TAG = "SyncManager"
+    }
 
     // ─── DTOs (Supabase row shapes) ──────────────────────────────────────
 
@@ -126,7 +131,11 @@ class SyncManager(
         pendingUploadJob?.cancel()
         pendingUploadJob = scope.launch {
             delay(3_000L)
-            try { uploadAll(userId) } catch (_: Exception) { }
+            try {
+                uploadAll(userId)
+            } catch (e: Exception) {
+                Log.e(TAG, "Debounced upload failed", e)
+            }
         }
     }
 
@@ -139,6 +148,7 @@ class SyncManager(
      */
     suspend fun uploadAll(userId: String) = syncMutex.withLock {
         withContext(Dispatchers.IO) {
+            Log.d(TAG, "uploadAll START for user=$userId")
             val pg = client.postgrest
 
             // 1. Delete existing remote data (reverse dependency order)
@@ -148,6 +158,7 @@ class SyncManager(
             pg.from("goals").delete { filter { eq("user_id", userId) } }
             pg.from("categories").delete { filter { eq("user_id", userId) } }
             pg.from("accounts").delete { filter { eq("user_id", userId) } }
+            Log.d(TAG, "uploadAll: deleted old remote data")
 
             // 2. Upload accounts, build localId → UUID map
             val localAccounts = db.accountDao().getAll()
@@ -165,6 +176,7 @@ class SyncManager(
                 val result = pg.from("accounts").insert(row) { select() }.decodeSingle<AccountRow>()
                 accountMap[acc.id] = result.id!!
             }
+            Log.d(TAG, "uploadAll: uploaded ${localAccounts.size} accounts")
 
             // 3. Upload categories, build localId → UUID map
             val localCategories = db.categoryDao().observeAll().first()
@@ -178,9 +190,11 @@ class SyncManager(
                 val result = pg.from("categories").insert(row) { select() }.decodeSingle<CategoryRow>()
                 categoryMap[cat.id] = result.id!!
             }
+            Log.d(TAG, "uploadAll: uploaded ${localCategories.size} categories")
 
             // 4. Upload transactions (remap accountId, categoryId)
             val localTx = db.transactionDao().observeAll().first()
+            var txCount = 0
             for (tx in localTx) {
                 val remoteAccId = accountMap[tx.accountId] ?: continue
                 val remoteCatId = tx.categoryId?.let { categoryMap[it] }
@@ -190,7 +204,9 @@ class SyncManager(
                     note = tx.note, date = tx.date, created_at = tx.createdAt
                 )
                 pg.from("transactions").insert(row)
+                txCount++
             }
+            Log.d(TAG, "uploadAll: uploaded $txCount transactions")
 
             // 5. Upload goals, build localId → UUID map
             val localGoals = db.goalDao().observeAll().first()
@@ -206,9 +222,11 @@ class SyncManager(
                 val result = pg.from("goals").insert(row) { select() }.decodeSingle<GoalRow>()
                 goalMap[goal.id] = result.id!!
             }
+            Log.d(TAG, "uploadAll: uploaded ${localGoals.size} goals")
 
             // 6. Upload goal contributions (remap goalId, accountId)
             val localContribs = db.goalContributionDao().observeAll().first()
+            var contribCount = 0
             for (c in localContribs) {
                 val remoteGoalId = goalMap[c.goalId] ?: continue
                 val remoteAccId = accountMap[c.accountId] ?: continue
@@ -217,10 +235,12 @@ class SyncManager(
                     account_id = remoteAccId, amount = c.amount, date = c.date
                 )
                 pg.from("goal_contributions").insert(row)
+                contribCount++
             }
 
             // 7. Upload transfers (remap fromAccountId, toAccountId)
             val localTransfers = db.transferDao().observeAll().first()
+            var transferCount = 0
             for (t in localTransfers) {
                 val remoteFromId = accountMap[t.fromAccountId] ?: continue
                 val remoteToId = accountMap[t.toAccountId] ?: continue
@@ -230,7 +250,9 @@ class SyncManager(
                     note = t.note, date = t.date, created_at = t.createdAt
                 )
                 pg.from("transfers").insert(row)
+                transferCount++
             }
+            Log.d(TAG, "uploadAll DONE: $txCount tx, ${localGoals.size} goals, $contribCount contribs, $transferCount transfers")
         }
     }
 
@@ -240,9 +262,12 @@ class SyncManager(
      * Full download: fetches all user data from Supabase, clears Room, inserts fresh.
      * Used on login when the device has no data (or user chooses "restore from cloud").
      * Thread-safe — waits for any running upload to finish first.
+     *
+     * @return `true` if remote data was found and written to Room; `false` if remote was empty.
      */
-    suspend fun downloadAll(userId: String) = syncMutex.withLock {
+    suspend fun downloadAll(userId: String): Boolean = syncMutex.withLock {
         withContext(Dispatchers.IO) {
+            Log.d(TAG, "downloadAll START for user=$userId")
             val pg = client.postgrest
 
             // 1. Fetch all remote data
@@ -259,11 +284,20 @@ class SyncManager(
             val remoteTransfers = pg.from("transfers")
                 .select { filter { eq("user_id", userId) } }.decodeList<TransferRow>()
 
+            Log.d(TAG, "downloadAll: remote has ${remoteAccounts.size} accounts, " +
+                    "${remoteCategories.size} categories, ${remoteTransactions.size} tx, " +
+                    "${remoteGoals.size} goals, ${remoteContribs.size} contribs, " +
+                    "${remoteTransfers.size} transfers")
+
             // If remote is completely empty, don't wipe local data
-            if (remoteAccounts.isEmpty() && remoteCategories.isEmpty()) return@withContext
+            if (remoteAccounts.isEmpty() && remoteCategories.isEmpty()) {
+                Log.w(TAG, "downloadAll: remote is EMPTY — keeping local data")
+                return@withContext false
+            }
 
             // 2. Clear local Room
             db.clearAllTables()
+            Log.d(TAG, "downloadAll: cleared local tables")
 
             // 3. Insert accounts — UUID → new local id
             val accountMap = mutableMapOf<String, Long>()
@@ -339,6 +373,10 @@ class SyncManager(
                 )
                 db.transferDao().upsert(entity)
             }
+
+            Log.d(TAG, "downloadAll DONE: wrote ${remoteAccounts.size} accounts, " +
+                    "${remoteCategories.size} categories, ${remoteTransactions.size} tx")
+            return@withContext true
         }
     }
 
@@ -349,15 +387,14 @@ class SyncManager(
      */
     suspend fun deleteAllUserData(userId: String) = syncMutex.withLock {
         withContext(Dispatchers.IO) {
+            Log.d(TAG, "deleteAllUserData for user=$userId")
             val pg = client.postgrest
-            // Delete remote (reverse FK order)
             pg.from("goal_contributions").delete { filter { eq("user_id", userId) } }
             pg.from("transfers").delete { filter { eq("user_id", userId) } }
             pg.from("transactions").delete { filter { eq("user_id", userId) } }
             pg.from("goals").delete { filter { eq("user_id", userId) } }
             pg.from("categories").delete { filter { eq("user_id", userId) } }
             pg.from("accounts").delete { filter { eq("user_id", userId) } }
-            // Clear local
             db.clearAllTables()
         }
     }

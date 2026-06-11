@@ -1,5 +1,7 @@
 package com.finora.presentation.settings
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,6 +25,8 @@ import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material.icons.rounded.AccountBalanceWallet
 import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.DeleteForever
+import androidx.compose.material.icons.rounded.FileDownload
+import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material.icons.rounded.LightMode
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.SettingsBrightness
@@ -45,9 +49,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.finora.data.backup.BackupManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.rounded.Check
@@ -74,7 +82,41 @@ fun SettingsScreen(
     val authState by viewModel.authState.collectAsStateWithLifecycle()
     val deleteStatus by viewModel.deleteStatus.collectAsStateWithLifecycle()
     val isSigningOut by viewModel.isSigningOut.collectAsStateWithLifecycle()
+    val backupStatus by viewModel.backupStatus.collectAsStateWithLifecycle()
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showImportDialog by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+
+    // SAF launcher: pick where to save the JSON backup, then write it.
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri != null) {
+            viewModel.exportBackup { jsonText ->
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri)?.use { os ->
+                        os.write(jsonText.toByteArray())
+                    } ?: error("Не удалось открыть файл для записи")
+                }
+            }
+        }
+    }
+
+    // SAF launcher: pick a JSON backup file, then restore from it.
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            viewModel.importBackup {
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.use { ins ->
+                        ins.readBytes().decodeToString()
+                    } ?: error("Не удалось открыть файл")
+                }
+            }
+        }
+    }
 
     val guideController = LocalGuideController.current
 
@@ -215,6 +257,38 @@ fun SettingsScreen(
             }
         }
 
+        // ─── Backup / restore (JSON) ─────────────────────────────────────
+        item { SectionHeader(title = "Резервная копия") }
+        item {
+            val working = backupStatus is SettingsViewModel.BackupStatus.Working
+            FinoraCard(padding = PaddingValues(0.dp)) {
+                Column {
+                    SettingRow(
+                        icon = Icons.Rounded.FileDownload,
+                        title = "Экспорт данных в файл",
+                        subtitle = "Сохранить все счета, операции и цели в JSON-файл",
+                        onClick = {
+                            if (!working) exportLauncher.launch(BackupManager.suggestedFileName())
+                        },
+                        trailing = {
+                            if (working) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            }
+                        }
+                    )
+                    SettingRow(
+                        icon = Icons.Rounded.FileUpload,
+                        title = "Импорт данных из файла",
+                        subtitle = "Восстановить данные из JSON-файла",
+                        onClick = { if (!working) showImportDialog = true }
+                    )
+                }
+            }
+        }
+
         item {
             FinoraCard {
                 Column {
@@ -276,6 +350,97 @@ fun SettingsScreen(
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) {
                     Text("Отмена")
+                }
+            }
+        )
+    }
+
+    // ─── Import confirmation dialog (import overwrites current data) ───────
+    if (showImportDialog) {
+        AlertDialog(
+            onDismissRequest = { showImportDialog = false },
+            icon = {
+                Icon(
+                    Icons.Rounded.FileUpload,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    "Импортировать данные?",
+                    style = MaterialTheme.typography.titleLarge,
+                    textAlign = TextAlign.Center
+                )
+            },
+            text = {
+                Text(
+                    "Текущие данные на устройстве будут заменены содержимым файла. " +
+                        "Рекомендуем сначала сделать экспорт.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showImportDialog = false
+                        importLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
+                    }
+                ) {
+                    Text("Выбрать файл")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showImportDialog = false }) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
+
+    // ─── Backup result dialog ─────────────────────────────────────────────
+    val status = backupStatus
+    val resultMessage: String? = when (status) {
+        is SettingsViewModel.BackupStatus.Exported ->
+            "Данные сохранены в файл (${status.records} записей)."
+        is SettingsViewModel.BackupStatus.Imported ->
+            "Данные восстановлены (${status.records} записей)."
+        is SettingsViewModel.BackupStatus.Error ->
+            "Ошибка: ${status.message}"
+        else -> null
+    }
+    if (resultMessage != null) {
+        val isError = status is SettingsViewModel.BackupStatus.Error
+        AlertDialog(
+            onDismissRequest = { viewModel.clearBackupStatus() },
+            icon = {
+                Icon(
+                    if (isError) Icons.Rounded.Warning else Icons.Rounded.Check,
+                    contentDescription = null,
+                    tint = if (isError) MaterialTheme.colorScheme.error
+                    else MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    if (isError) "Не получилось" else "Готово",
+                    style = MaterialTheme.typography.titleLarge,
+                    textAlign = TextAlign.Center
+                )
+            },
+            text = {
+                Text(
+                    resultMessage,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center
+                )
+            },
+            confirmButton = {
+                Button(onClick = { viewModel.clearBackupStatus() }) {
+                    Text("Ок")
                 }
             }
         )

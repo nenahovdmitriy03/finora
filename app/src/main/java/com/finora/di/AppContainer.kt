@@ -2,6 +2,7 @@ package com.finora.di
 
 import android.content.Context
 import androidx.room.Room
+import com.finora.data.backup.BackupManager
 import com.finora.data.local.AppDatabase
 import com.finora.data.preferences.SettingsRepository
 import com.finora.data.remote.AuthRepository
@@ -34,6 +35,9 @@ class AppContainer(context: Context) {
     val authRepository: AuthRepository = AuthRepository(supabaseClient)
 
     val syncManager: SyncManager = SyncManager(supabaseClient, db)
+
+    /** Manual JSON backup/restore of all local data. */
+    val backupManager: BackupManager = BackupManager(db)
 
     // FinanceRepository gets sync dependencies for auto-sync after data changes
     val repository: FinanceRepository = FinanceRepository(db, syncManager, authRepository)

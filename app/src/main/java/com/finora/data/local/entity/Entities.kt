@@ -3,7 +3,9 @@ package com.finora.data.local.entity
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import kotlinx.serialization.Serializable
 
+@Serializable
 @Entity(tableName = "accounts")
 data class AccountEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -25,6 +27,7 @@ data class AccountEntity(
     val interestPayoutDay: Int = 1
 )
 
+@Serializable
 @Entity(tableName = "categories")
 data class CategoryEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -35,6 +38,7 @@ data class CategoryEntity(
     val isDefault: Boolean
 )
 
+@Serializable
 @Entity(
     tableName = "transactions",
     indices = [Index("accountId"), Index("categoryId"), Index("date")]
@@ -50,6 +54,7 @@ data class TransactionEntity(
     val createdAt: Long
 )
 
+@Serializable
 @Entity(tableName = "goals")
 data class GoalEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -65,6 +70,7 @@ data class GoalEntity(
 )
 
 /** Tracks every deposit/withdrawal to a goal from a specific account. */
+@Serializable
 @Entity(
     tableName = "goal_contributions",
     indices = [Index("goalId"), Index("accountId")]
@@ -79,6 +85,7 @@ data class GoalContributionEntity(
 )
 
 /** Money moved between two accounts (not income/expense). */
+@Serializable
 @Entity(
     tableName = "transfers",
     indices = [Index("fromAccountId"), Index("toAccountId"), Index("date")]

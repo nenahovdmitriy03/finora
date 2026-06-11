@@ -79,6 +79,9 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions ORDER BY date DESC, id DESC")
     fun observeAll(): Flow<List<TransactionEntity>>
 
+    @Query("SELECT * FROM transactions")
+    suspend fun getAll(): List<TransactionEntity>
+
     /** Most recent N transactions — for the home screen preview (avoids loading all rows). */
     @Query("SELECT * FROM transactions ORDER BY date DESC, id DESC LIMIT :limit")
     fun observeRecent(limit: Int): Flow<List<TransactionEntity>>
@@ -133,6 +136,9 @@ interface GoalDao {
     @Query("SELECT * FROM goals ORDER BY createdAt DESC")
     fun observeAll(): Flow<List<GoalEntity>>
 
+    @Query("SELECT * FROM goals")
+    suspend fun getAll(): List<GoalEntity>
+
     @Query("SELECT * FROM goals WHERE id = :id")
     suspend fun getById(id: Long): GoalEntity?
 
@@ -150,6 +156,12 @@ interface GoalContributionDao {
     /** All contributions across all goals, newest first. */
     @Query("SELECT * FROM goal_contributions ORDER BY date DESC")
     fun observeAll(): Flow<List<GoalContributionEntity>>
+
+    @Query("SELECT * FROM goal_contributions")
+    suspend fun getAll(): List<GoalContributionEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(contribution: GoalContributionEntity): Long
 
     /** Contributions for one goal, newest first. */
     @Query("SELECT * FROM goal_contributions WHERE goalId = :goalId ORDER BY date DESC")
@@ -171,6 +183,9 @@ interface GoalContributionDao {
 interface TransferDao {
     @Query("SELECT * FROM transfers ORDER BY date DESC, id DESC")
     fun observeAll(): Flow<List<TransferEntity>>
+
+    @Query("SELECT * FROM transfers")
+    suspend fun getAll(): List<TransferEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(transfer: TransferEntity): Long

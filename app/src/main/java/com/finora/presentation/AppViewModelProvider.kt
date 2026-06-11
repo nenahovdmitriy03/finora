@@ -36,7 +36,8 @@ object AppViewModelProvider {
             SettingsViewModel(
                 creationApp(this).container.settings,
                 creationApp(this).container.authRepository,
-                creationApp(this).container.syncManager
+                creationApp(this).container.syncManager,
+                creationApp(this).container.backupManager
             )
         }
         initializer {

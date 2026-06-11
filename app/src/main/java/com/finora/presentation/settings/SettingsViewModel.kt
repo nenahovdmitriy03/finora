@@ -2,6 +2,7 @@ package com.finora.presentation.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.finora.data.backup.BackupManager
 import com.finora.data.preferences.SettingsRepository
 import com.finora.data.remote.AuthRepository
 import com.finora.data.remote.SyncManager
@@ -18,7 +19,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 class SettingsViewModel(
     private val settings: SettingsRepository,
     private val authRepo: AuthRepository,
-    private val syncManager: SyncManager
+    private val syncManager: SyncManager,
+    private val backupManager: BackupManager
 ) : ViewModel() {
 
     val themeMode: StateFlow<ThemeMode> = settings.themeMode
@@ -42,6 +44,66 @@ class SettingsViewModel(
 
     private val _deleteStatus = MutableStateFlow<DeleteStatus>(DeleteStatus.Idle)
     val deleteStatus: StateFlow<DeleteStatus> = _deleteStatus.asStateFlow()
+
+    // ─── Backup / restore (JSON) ─────────────────────────────────────────
+
+    sealed interface BackupStatus {
+        data object Idle : BackupStatus
+        data object Working : BackupStatus
+        data class Exported(val records: Int) : BackupStatus
+        data class Imported(val records: Int) : BackupStatus
+        data class Error(val message: String) : BackupStatus
+    }
+
+    private val _backupStatus = MutableStateFlow<BackupStatus>(BackupStatus.Idle)
+    val backupStatus: StateFlow<BackupStatus> = _backupStatus.asStateFlow()
+
+    fun clearBackupStatus() { _backupStatus.value = BackupStatus.Idle }
+
+    /**
+     * Exports all local data to JSON. The [writer] lambda receives the JSON text
+     * and is responsible for writing it to the file the user picked (the
+     * Composable does the actual content-resolver IO so the VM stays Android-free).
+     */
+    fun exportBackup(writer: suspend (String) -> Unit) {
+        viewModelScope.launch {
+            _backupStatus.value = BackupStatus.Working
+            try {
+                val jsonText = backupManager.exportToJson()
+                writer(jsonText)
+                val records = backupManager.parse(jsonText).totalRecords
+                _backupStatus.value = BackupStatus.Exported(records)
+            } catch (e: Exception) {
+                _backupStatus.value = BackupStatus.Error(e.message ?: "Не удалось сохранить файл")
+            }
+        }
+    }
+
+    /**
+     * Restores local data from a JSON backup. The [reader] lambda returns the
+     * file contents (read by the Composable from the picked Uri). On success,
+     * if the user is logged in, the restored data is also pushed to the cloud.
+     */
+    fun importBackup(reader: suspend () -> String) {
+        viewModelScope.launch {
+            _backupStatus.value = BackupStatus.Working
+            try {
+                val jsonText = reader()
+                val data = backupManager.importFromJson(jsonText)
+                // Keep the cloud in sync with what we just restored.
+                val userId = authRepo.currentUserId()
+                if (userId != null) {
+                    settings.setDataOwnerId(userId)
+                    runCatching { syncManager.uploadAll(userId) }
+                }
+                _backupStatus.value = BackupStatus.Imported(data.totalRecords)
+            } catch (e: Exception) {
+                _backupStatus.value = BackupStatus.Error(
+                    e.message ?: "Файл повреждён или имеет неверный формат"
+                )
+            }
+        }
+    }
 
     fun setTheme(mode: ThemeMode) {
         viewModelScope.launch { settings.setThemeMode(mode) }

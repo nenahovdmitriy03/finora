@@ -3,38 +3,43 @@ package com.finora.presentation.settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material.icons.rounded.AccountBalanceWallet
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.DeleteForever
 import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material.icons.rounded.LightMode
-import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.SettingsBrightness
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -47,21 +52,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.finora.data.backup.BackupManager
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import androidx.compose.foundation.border
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Cloud
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.finora.data.backup.BackupManager
 import com.finora.data.remote.AuthRepository
 import com.finora.domain.model.AccentColor
 import com.finora.domain.model.ThemeMode
@@ -71,6 +71,9 @@ import com.finora.presentation.components.SectionHeader
 import com.finora.presentation.guide.GuideStep
 import com.finora.presentation.guide.LocalGuideController
 import com.finora.presentation.guide.guideTarget
+import com.finora.presentation.theme.IncomeGreen
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun SettingsScreen(
@@ -119,11 +122,13 @@ fun SettingsScreen(
     }
 
     val guideController = LocalGuideController.current
+    val auth = authState
+    val backupWorking = backupStatus is SettingsViewModel.BackupStatus.Working
 
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 120.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 120.dp),
+        verticalArrangement = Arrangement.spacedBy(22.dp)
     ) {
         item {
             Text(
@@ -133,176 +138,119 @@ fun SettingsScreen(
             )
         }
 
-        // ─── Account section ─────────────────────────────────────────────
-        item { SectionHeader(title = "Аккаунт") }
+        // ─── Profile / account state ─────────────────────────────────────
         item {
-            val auth = authState
             if (auth is AuthRepository.AuthState.Authenticated) {
+                ProfileHeader(email = auth.email ?: "Пользователь")
+            } else {
+                SignInPrompt(onSignIn = { viewModel.goToRegister() })
+            }
+        }
+
+        // ─── Appearance (theme + accent in one card) ─────────────────────
+        item { SectionHeader(title = "Оформление") }
+        item {
+            FinoraCard {
+                Column {
+                    GroupLabel("Тема")
+                    Spacer(Modifier.height(10.dp))
+                    Box(modifier = Modifier.guideTarget(guideController, GuideStep.SETTINGS_THEME)) {
+                        ThemeSelector(selected = themeMode, onSelect = viewModel::setTheme)
+                    }
+                    Spacer(Modifier.height(22.dp))
+                    GroupLabel("Цвет акцента")
+                    Spacer(Modifier.height(14.dp))
+                    AccentSelector(selected = accent, onSelect = viewModel::setAccent)
+                }
+            }
+        }
+
+        // ─── Data (accounts + backup grouped) ────────────────────────────
+        item { SectionHeader(title = "Данные") }
+        item {
+            FinoraCard(padding = PaddingValues(0.dp)) {
+                Column {
+                    SettingRow(
+                        icon = Icons.Rounded.AccountBalanceWallet,
+                        title = "Мои счета",
+                        subtitle = "Банки, карты и кошельки",
+                        onClick = onOpenAccounts
+                    )
+                    RowDivider()
+                    SettingRow(
+                        icon = Icons.Rounded.FileDownload,
+                        title = "Экспорт в файл",
+                        subtitle = "Сохранить копию всех данных в JSON",
+                        onClick = {
+                            if (!backupWorking) exportLauncher.launch(BackupManager.suggestedFileName())
+                        },
+                        showChevron = false,
+                        trailing = { if (backupWorking) RowProgress() }
+                    )
+                    RowDivider()
+                    SettingRow(
+                        icon = Icons.Rounded.FileUpload,
+                        title = "Импорт из файла",
+                        subtitle = "Восстановить данные из JSON-файла",
+                        onClick = { if (!backupWorking) showImportDialog = true },
+                        showChevron = false
+                    )
+                }
+            }
+        }
+
+        // ─── Account actions (only when signed in) ───────────────────────
+        if (auth is AuthRepository.AuthState.Authenticated) {
+            item { SectionHeader(title = "Аккаунт") }
+            item {
                 FinoraCard(padding = PaddingValues(0.dp)) {
                     Column {
-                        SettingRow(
-                            icon = Icons.Rounded.Person,
-                            title = auth.email ?: "Пользователь",
-                            subtitle = "Вы вошли в аккаунт",
-                            onClick = {}
-                        )
-                        SettingRow(
-                            icon = Icons.Rounded.Cloud,
-                            title = "Облачная синхронизация",
-                            subtitle = "Данные синхронизируются автоматически",
-                            onClick = {}
-                        )
-                        // Logout
                         SettingRow(
                             icon = Icons.AutoMirrored.Rounded.Logout,
                             title = if (isSigningOut) "Выход…" else "Выйти",
                             subtitle = if (isSigningOut) "Сохраняю данные" else "Выйти из аккаунта",
                             onClick = { if (!isSigningOut) viewModel.signOut() },
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            trailing = {
-                                if (isSigningOut) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(20.dp),
-                                        strokeWidth = 2.dp
-                                    )
-                                }
-                            }
+                            showChevron = false,
+                            trailing = { if (isSigningOut) RowProgress() }
                         )
-                        // Delete account
+                        RowDivider()
                         SettingRow(
                             icon = Icons.Rounded.DeleteForever,
                             title = "Удалить аккаунт",
                             subtitle = "Удалить все данные безвозвратно",
                             onClick = { showDeleteDialog = true },
                             tint = MaterialTheme.colorScheme.error,
+                            showChevron = false,
                             trailing = {
-                                if (deleteStatus is SettingsViewModel.DeleteStatus.Deleting) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(20.dp),
-                                        strokeWidth = 2.dp
-                                    )
-                                }
+                                if (deleteStatus is SettingsViewModel.DeleteStatus.Deleting) RowProgress()
                             }
                         )
                     }
                 }
-            } else {
-                FinoraCard {
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(44.dp)
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    Icons.Rounded.Cloud,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                            Spacer(Modifier.width(14.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    "Войдите, чтобы сохранить данные",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onBackground
-                                )
-                                Text(
-                                    "Сейчас данные хранятся только на устройстве. " +
-                                        "Создайте аккаунт — и они будут в облаке, " +
-                                        "доступны на всех устройствах.",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(16.dp))
-                        Button(
-                            onClick = { viewModel.goToRegister() },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Войти или зарегистрироваться")
-                        }
-                    }
-                }
             }
         }
 
-        item { SectionHeader(title = "Внешний вид") }
+        // ─── App footer ──────────────────────────────────────────────────
         item {
-            Box(modifier = Modifier.guideTarget(guideController, GuideStep.SETTINGS_THEME)) {
-                ThemeSelector(selected = themeMode, onSelect = viewModel::setTheme)
-            }
-        }
-
-        item { SectionHeader(title = "Цвет акцента") }
-        item {
-            FinoraCard {
-                AccentSelector(selected = accent, onSelect = viewModel::setAccent)
-            }
-        }
-
-        item { SectionHeader(title = "Управление") }
-        item {
-            FinoraCard(padding = PaddingValues(0.dp)) {
-                SettingRow(
-                    icon = Icons.Rounded.AccountBalanceWallet,
-                    title = "Мои счета",
-                    subtitle = "Банки, карты и кошельки",
-                    onClick = onOpenAccounts
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    "Finora",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            }
-        }
-
-        // ─── Backup / restore (JSON) ─────────────────────────────────────
-        item { SectionHeader(title = "Резервная копия") }
-        item {
-            val working = backupStatus is SettingsViewModel.BackupStatus.Working
-            FinoraCard(padding = PaddingValues(0.dp)) {
-                Column {
-                    SettingRow(
-                        icon = Icons.Rounded.FileDownload,
-                        title = "Экспорт данных в файл",
-                        subtitle = "Сохранить все счета, операции и цели в JSON-файл",
-                        onClick = {
-                            if (!working) exportLauncher.launch(BackupManager.suggestedFileName())
-                        },
-                        trailing = {
-                            if (working) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    strokeWidth = 2.dp
-                                )
-                            }
-                        }
-                    )
-                    SettingRow(
-                        icon = Icons.Rounded.FileUpload,
-                        title = "Импорт данных из файла",
-                        subtitle = "Восстановить данные из JSON-файла",
-                        onClick = { if (!working) showImportDialog = true }
-                    )
-                }
-            }
-        }
-
-        item {
-            FinoraCard {
-                Column {
-                    Text(
-                        "Finora",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Text(
-                        "Версия 1.0 · Сделано с ❤",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "Версия 1.0 · Сделано с ❤",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
@@ -329,7 +277,7 @@ fun SettingsScreen(
             text = {
                 Text(
                     "Все ваши данные будут удалены из облака и с устройства. " +
-                    "Это действие необратимо.",
+                        "Это действие необратимо.",
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center
                 )
@@ -447,6 +395,114 @@ fun SettingsScreen(
     }
 }
 
+// ─── Profile header ──────────────────────────────────────────────────────
+@Composable
+private fun ProfileHeader(email: String) {
+    val initial = email.trim().firstOrNull()?.uppercase() ?: "?"
+    FinoraCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.linearGradient(
+                            listOf(
+                                MaterialTheme.colorScheme.primary,
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)
+                            )
+                        )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    initial,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White
+                )
+            }
+            Spacer(Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    email,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Spacer(Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Rounded.CheckCircle,
+                        contentDescription = null,
+                        tint = IncomeGreen,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        "Синхронизация включена",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SignInPrompt(onSignIn: () -> Unit) {
+    FinoraCard {
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Rounded.Cloud,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Spacer(Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Войдите, чтобы сохранить данные",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Text(
+                        "Данные хранятся только на устройстве. Создайте аккаунт — " +
+                            "и они будут в облаке, на всех устройствах.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            Button(onClick = onSignIn, modifier = Modifier.fillMaxWidth()) {
+                Text("Войти или зарегистрироваться")
+            }
+        }
+    }
+}
+
+// ─── Appearance selectors ──────────────────────────────────────────────────
+@Composable
+private fun GroupLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+}
+
 @Composable
 private fun ThemeSelector(selected: ThemeMode, onSelect: (ThemeMode) -> Unit) {
     val options = listOf(
@@ -457,8 +513,8 @@ private fun ThemeSelector(selected: ThemeMode, onSelect: (ThemeMode) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(MaterialTheme.shapes.large)
-            .background(MaterialTheme.colorScheme.surface)
+            .clip(MaterialTheme.shapes.medium)
+            .background(MaterialTheme.colorScheme.background)
             .padding(6.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
@@ -477,44 +533,36 @@ private fun ThemeSelector(selected: ThemeMode, onSelect: (ThemeMode) -> Unit) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AccentSelector(selected: AccentColor, onSelect: (AccentColor) -> Unit) {
-    Column {
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            AccentColor.entries.forEach { option ->
-                val isSelected = option == selected
-                Box(
-                    modifier = Modifier
-                        .size(46.dp)
-                        .clip(CircleShape)
-                        .background(Color(option.seed))
-                        .border(
-                            width = if (isSelected) 3.dp else 0.dp,
-                            color = MaterialTheme.colorScheme.onBackground,
-                            shape = CircleShape
-                        )
-                        .clickable { onSelect(option) },
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (isSelected) {
-                        Icon(
-                            Icons.Rounded.Check,
-                            contentDescription = option.title,
-                            tint = Color.White,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        AccentColor.entries.forEach { option ->
+            val isSelected = option == selected
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(Color(option.seed))
+                    .border(
+                        width = if (isSelected) 3.dp else 0.dp,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        shape = CircleShape
+                    )
+                    .clickable { onSelect(option) },
+                contentAlignment = Alignment.Center
+            ) {
+                if (isSelected) {
+                    Icon(
+                        Icons.Rounded.Check,
+                        contentDescription = option.title,
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
         }
-        Spacer(Modifier.height(12.dp))
-        Text(
-            "Выбрано: ${selected.title}",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
 }
 
@@ -528,10 +576,10 @@ private fun ThemeOption(
 ) {
     Column(
         modifier = modifier
-            .clip(MaterialTheme.shapes.medium)
+            .clip(MaterialTheme.shapes.small)
             .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
             .clickable { onClick() }
-            .padding(vertical = 14.dp),
+            .padding(vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Icon(
@@ -550,6 +598,25 @@ private fun ThemeOption(
     }
 }
 
+// ─── Reusable row pieces ───────────────────────────────────────────────────
+@Composable
+private fun RowProgress() {
+    CircularProgressIndicator(
+        modifier = Modifier.size(20.dp),
+        strokeWidth = 2.dp
+    )
+}
+
+/** Thin divider inset to line up with the row text (past the icon chip). */
+@Composable
+private fun RowDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(start = 74.dp, end = 16.dp),
+        thickness = 1.dp,
+        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)
+    )
+}
+
 @Composable
 private fun SettingRow(
     icon: ImageVector,
@@ -557,12 +624,12 @@ private fun SettingRow(
     subtitle: String,
     onClick: () -> Unit,
     tint: Color = MaterialTheme.colorScheme.primary,
+    showChevron: Boolean = true,
     trailing: @Composable (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
             .clickable { onClick() }
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -578,13 +645,20 @@ private fun SettingRow(
         }
         Spacer(Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
-            Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
-        if (trailing != null) {
-            trailing()
-        } else {
-            Icon(
+        when {
+            trailing != null -> trailing()
+            showChevron -> Icon(
                 Icons.AutoMirrored.Rounded.KeyboardArrowRight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant

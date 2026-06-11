@@ -249,7 +249,7 @@ fun GuideOverlay(
 
             // Mascot
             Box(modifier = Modifier.offset { IntOffset(0, floatOffset.roundToInt()) }) {
-                MascotGirl(modifier = Modifier.size(width = 90.dp, height = 130.dp))
+                MascotGirl(modifier = Modifier.size(width = 120.dp, height = 160.dp))
             }
             Spacer(Modifier.height(10.dp))
 

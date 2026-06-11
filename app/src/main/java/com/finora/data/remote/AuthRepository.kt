@@ -29,6 +29,7 @@ class AuthRepository(private val client: SupabaseClient) {
                     email = user?.email
                 )
             }
+            is SessionStatus.NotAuthenticated -> AuthState.NotAuthenticated
             else -> AuthState.Loading
         }
     }

@@ -1,6 +1,8 @@
 package com.finora.presentation.navigation
 
+import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -57,8 +59,9 @@ import com.finora.presentation.settings.SettingsScreen
 import com.finora.presentation.transactions.TransactionsScreen
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.status.SessionStatus
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+
+private const val NAV_ANIM_MS = 300
 
 @Composable
 fun FinoraNavHost(navController: NavHostController = rememberNavController()) {
@@ -126,21 +129,11 @@ fun FinoraNavHost(navController: NavHostController = rememberNavController()) {
         }
     }
 
-    // Auto-sync on start — only upload if Room has data (avoids race condition
-    // on fresh install where uploadAll deletes remote data before downloadAll finishes)
-    LaunchedEffect(isAuthenticated) {
-        if (isAuthenticated) {
-            launch(Dispatchers.IO) {
-                try {
-                    val userId = app.container.authRepository.currentUserId()
-                    val hasLocalData = app.container.db.accountDao().getAll().isNotEmpty()
-                    if (userId != null && hasLocalData) {
-                        app.container.syncManager.uploadAll(userId)
-                    }
-                } catch (_: Exception) { }
-            }
-        }
-    }
+    // NOTE: Auto-upload LaunchedEffect was REMOVED.
+    // Upload/download is now exclusively handled by:
+    //   • AuthViewModel (download on login, upload on register)
+    //   • SettingsViewModel (upload before sign-out)
+    //   • SyncManager.scheduleUpload() (debounced after data changes)
 
     // Start guide after onboarding
     LaunchedEffect(onboardingCompleted, guideCompleted) {
@@ -196,7 +189,32 @@ fun FinoraNavHost(navController: NavHostController = rememberNavController()) {
                 NavHost(
                     navController = navController,
                     startDestination = startDest,
-                    modifier = Modifier.padding(innerPadding)
+                    modifier = Modifier.padding(innerPadding),
+                    // Smooth slide transitions for all routes
+                    enterTransition = {
+                        slideIntoContainer(
+                            towards = AnimatedContentTransitionScope.SlideDirection.Start,
+                            animationSpec = tween(NAV_ANIM_MS)
+                        ) + fadeIn(tween(NAV_ANIM_MS))
+                    },
+                    exitTransition = {
+                        slideOutOfContainer(
+                            towards = AnimatedContentTransitionScope.SlideDirection.Start,
+                            animationSpec = tween(NAV_ANIM_MS)
+                        ) + fadeOut(tween(NAV_ANIM_MS))
+                    },
+                    popEnterTransition = {
+                        slideIntoContainer(
+                            towards = AnimatedContentTransitionScope.SlideDirection.End,
+                            animationSpec = tween(NAV_ANIM_MS)
+                        ) + fadeIn(tween(NAV_ANIM_MS))
+                    },
+                    popExitTransition = {
+                        slideOutOfContainer(
+                            towards = AnimatedContentTransitionScope.SlideDirection.End,
+                            animationSpec = tween(NAV_ANIM_MS)
+                        ) + fadeOut(tween(NAV_ANIM_MS))
+                    }
                 ) {
                     composable(Destination.Auth.route) {
                         AuthScreen(

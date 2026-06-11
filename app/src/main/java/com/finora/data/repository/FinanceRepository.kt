@@ -4,6 +4,8 @@ import com.finora.data.local.AppDatabase
 import com.finora.data.local.DefaultData
 import com.finora.data.local.toDomain
 import com.finora.data.local.toEntity
+import com.finora.data.remote.AuthRepository
+import com.finora.data.remote.SyncManager
 import com.finora.domain.model.Account
 import com.finora.domain.model.AccountBalance
 import com.finora.domain.model.Category
@@ -23,7 +25,11 @@ import java.util.Calendar
  * Single source of truth for all finance data. Reads return [Flow]s of domain
  * models, writes are suspend functions.
  */
-class FinanceRepository(private val db: AppDatabase) {
+class FinanceRepository(
+    private val db: AppDatabase,
+    private val syncManager: SyncManager? = null,
+    private val authRepository: AuthRepository? = null
+) {
 
     private val accountDao = db.accountDao()
     private val categoryDao = db.categoryDao()
@@ -35,6 +41,12 @@ class FinanceRepository(private val db: AppDatabase) {
     private companion object {
         const val DAY_MS = 86_400_000L
         const val MAX_PERIODS = 400 // safety cap against huge backfills
+    }
+
+    /** Triggers a debounced cloud upload after data mutations. */
+    private fun triggerCloudSync() {
+        val userId = authRepository?.currentUserId() ?: return
+        syncManager?.scheduleUpload(userId)
     }
 
     // ─── Accounts ────────────────────────────────────────────────────────────
@@ -65,13 +77,17 @@ class FinanceRepository(private val db: AppDatabase) {
     fun observeTotalBalance(): Flow<Double> =
         observeAccountBalances().map { list -> list.sumOf { it.balance } }
 
-    suspend fun addAccount(account: Account): Long = accountDao.upsert(account.toEntity())
-    suspend fun updateAccount(account: Account) = accountDao.update(account.toEntity())
+    suspend fun addAccount(account: Account): Long =
+        accountDao.upsert(account.toEntity()).also { triggerCloudSync() }
+    suspend fun updateAccount(account: Account) {
+        accountDao.update(account.toEntity()); triggerCloudSync()
+    }
     suspend fun deleteAccount(account: Account) {
         transactionDao.deleteByAccount(account.id)
         transferDao.deleteByAccount(account.id)
         goalContributionDao.deleteByAccount(account.id)
         accountDao.delete(account.toEntity())
+        triggerCloudSync()
     }
 
     // ─── Categories ──────────────────────────────────────────────────────────
@@ -82,8 +98,11 @@ class FinanceRepository(private val db: AppDatabase) {
     fun observeCategories(type: TransactionType): Flow<List<Category>> =
         observeCategories().map { list -> list.filter { it.type == type } }
 
-    suspend fun addCategory(category: Category): Long = categoryDao.upsert(category.toEntity())
-    suspend fun deleteCategory(category: Category) = categoryDao.delete(category.toEntity())
+    suspend fun addCategory(category: Category): Long =
+        categoryDao.upsert(category.toEntity()).also { triggerCloudSync() }
+    suspend fun deleteCategory(category: Category) {
+        categoryDao.delete(category.toEntity()); triggerCloudSync()
+    }
 
     // ─── Transactions ────────────────────────────────────────────────────────
 
@@ -108,10 +127,11 @@ class FinanceRepository(private val db: AppDatabase) {
         transactionDao.observeBetween(from, to).map { list -> list.map { it.toDomain() } }
 
     suspend fun addTransaction(transaction: Transaction): Long =
-        transactionDao.upsert(transaction.toEntity())
+        transactionDao.upsert(transaction.toEntity()).also { triggerCloudSync() }
 
-    suspend fun deleteTransaction(transaction: Transaction) =
-        transactionDao.delete(transaction.toEntity())
+    suspend fun deleteTransaction(transaction: Transaction) {
+        transactionDao.delete(transaction.toEntity()); triggerCloudSync()
+    }
 
     suspend fun getTransaction(id: Long): Transaction? =
         transactionDao.getById(id)?.toDomain()
@@ -122,10 +142,11 @@ class FinanceRepository(private val db: AppDatabase) {
         transferDao.observeAll().map { list -> list.map { it.toDomain() } }
 
     suspend fun addTransfer(transfer: Transfer): Long =
-        transferDao.upsert(transfer.toEntity())
+        transferDao.upsert(transfer.toEntity()).also { triggerCloudSync() }
 
-    suspend fun deleteTransfer(transfer: Transfer) =
-        transferDao.delete(transfer.toEntity())
+    suspend fun deleteTransfer(transfer: Transfer) {
+        transferDao.delete(transfer.toEntity()); triggerCloudSync()
+    }
 
     // ─── Goals ───────────────────────────────────────────────────────────────
 
@@ -136,11 +157,15 @@ class FinanceRepository(private val db: AppDatabase) {
     fun observeGoalContributions(): Flow<List<GoalContribution>> =
         goalContributionDao.observeAll().map { list -> list.map { it.toDomain() } }
 
-    suspend fun addGoal(goal: Goal): Long = goalDao.upsert(goal.toEntity())
-    suspend fun updateGoal(goal: Goal) { goalDao.upsert(goal.toEntity()) }
+    suspend fun addGoal(goal: Goal): Long =
+        goalDao.upsert(goal.toEntity()).also { triggerCloudSync() }
+    suspend fun updateGoal(goal: Goal) {
+        goalDao.upsert(goal.toEntity()); triggerCloudSync()
+    }
     suspend fun deleteGoal(goal: Goal) {
         goalContributionDao.deleteByGoal(goal.id)
         goalDao.delete(goal.toEntity())
+        triggerCloudSync()
     }
 
     /**
@@ -175,6 +200,7 @@ class FinanceRepository(private val db: AppDatabase) {
             ).toEntity()
         )
         // Note: account.initialBalance is intentionally NOT changed.
+        triggerCloudSync()
     }
 
     // ─── Interest / capitalization ───────────────────────────────────────────

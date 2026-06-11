@@ -25,8 +25,6 @@ class AppContainer(context: Context) {
         )
         .build()
 
-    val repository: FinanceRepository = FinanceRepository(db)
-
     val settings: SettingsRepository = SettingsRepository(context.applicationContext)
 
     // ─── Supabase ────────────────────────────────────────────────────────
@@ -36,4 +34,7 @@ class AppContainer(context: Context) {
     val authRepository: AuthRepository = AuthRepository(supabaseClient)
 
     val syncManager: SyncManager = SyncManager(supabaseClient, db)
+
+    // FinanceRepository gets sync dependencies for auto-sync after data changes
+    val repository: FinanceRepository = FinanceRepository(db, syncManager, authRepository)
 }

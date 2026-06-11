@@ -54,11 +54,11 @@ class SettingsViewModel(
     fun signOut() {
         viewModelScope.launch {
             _isSigningOut.value = true
-            // Upload with 5s timeout — don't block sign-out if network is slow
+            // Upload with 8s timeout — don't block sign-out if network is slow
             try {
                 val userId = authRepo.currentUserId()
                 if (userId != null) {
-                    withTimeoutOrNull(5_000L) {
+                    withTimeoutOrNull(8_000L) {
                         syncManager.uploadAll(userId)
                     }
                 }

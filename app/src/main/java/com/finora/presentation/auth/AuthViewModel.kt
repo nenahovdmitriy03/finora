@@ -61,18 +61,31 @@ class AuthViewModel(
         viewModelScope.launch {
             try {
                 if (s.isLogin) {
+                    // ─── Login flow ──────────────────────────────────────
                     authRepo.signIn(s.email, s.password)
+                    _state.value = _state.value.copy(
+                        isLoading = true,
+                        info = "Загрузка данных из облака…"
+                    )
                     val userId = authRepo.currentUserId()
                     if (userId != null) {
-                        try { syncManager.downloadAll(userId) } catch (_: Exception) { }
+                        // Download cloud data → overwrites Room with user's data.
+                        // If remote is empty (new account, no data), Room stays seeded.
+                        syncManager.downloadAll(userId)
                     }
-                    _state.value = _state.value.copy(isLoading = false, success = true)
+                    _state.value = _state.value.copy(isLoading = false, info = null, success = true)
                 } else {
+                    // ─── Registration flow ───────────────────────────────
                     authRepo.signUp(s.email, s.password)
                     val userId = authRepo.currentUserId()
                     if (userId != null) {
-                        try { syncManager.uploadAll(userId) } catch (_: Exception) { }
-                        _state.value = _state.value.copy(isLoading = false, success = true)
+                        _state.value = _state.value.copy(
+                            isLoading = true,
+                            info = "Сохранение данных в облако…"
+                        )
+                        // Upload local data to cloud for the first time.
+                        syncManager.uploadAll(userId)
+                        _state.value = _state.value.copy(isLoading = false, info = null, success = true)
                     } else {
                         _state.value = _state.value.copy(
                             isLoading = false,
@@ -82,7 +95,7 @@ class AuthViewModel(
                 }
             } catch (e: Exception) {
                 val msg = translateError(e.message)
-                _state.value = _state.value.copy(isLoading = false, error = msg)
+                _state.value = _state.value.copy(isLoading = false, info = null, error = msg)
             }
         }
     }

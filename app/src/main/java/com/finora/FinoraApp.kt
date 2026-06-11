@@ -22,14 +22,11 @@ class FinoraApp : Application() {
             // Pay out any due interest on savings accounts.
             container.repository.applyInterestAccruals()
         }
-        // Auto-sync: if authenticated, upload local data to cloud on start
-        appScope.launch {
-            try {
-                val userId = container.authRepository.currentUserId()
-                if (userId != null) {
-                    container.syncManager.uploadAll(userId)
-                }
-            } catch (_: Exception) { /* offline or no session — skip */ }
-        }
+        // NOTE: Auto-upload on start was REMOVED — it raced with downloadAll()
+        // during login on fresh install, deleting remote data before download
+        // could fetch it. Sync to cloud now happens:
+        //   • On registration (AuthViewModel)
+        //   • Before sign-out (SettingsViewModel)
+        //   • After data changes (debounced in SyncManager)
     }
 }

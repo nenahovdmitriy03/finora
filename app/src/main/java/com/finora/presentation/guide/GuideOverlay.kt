@@ -247,9 +247,12 @@ fun GuideOverlay(
         ) {
             if (!isBelowCenter) Spacer(Modifier.height(16.dp))
 
-            // Mascot
+            // Mascot — emotion changes with the step
             Box(modifier = Modifier.offset { IntOffset(0, floatOffset.roundToInt()) }) {
-                MascotGirl(modifier = Modifier.size(width = 120.dp, height = 160.dp))
+                MascotGirl(
+                    modifier = Modifier.size(width = 130.dp, height = 170.dp),
+                    resId = emotionFor(step)
+                )
             }
             Spacer(Modifier.height(10.dp))
 
@@ -314,16 +317,33 @@ fun GuideOverlay(
 }
 
 
-// ─── Anime girl mascot «Алия» — PNG drawable ────────────────────────────────
+// ─── Mascot «Алия» — emotion PNGs per guide step ────────────────────────────
 
 /**
- * Mascot character «Алия» — loaded from a detailed PNG drawable.
- * The image lives at res/drawable-nodpi/mascot_aliya.png.
+ * Maps a guide step to the mascot emotion drawable.
+ * Emotion changes as the user moves through the tour.
+ */
+@androidx.annotation.DrawableRes
+fun emotionFor(step: Int): Int = when (step) {
+    GuideStep.BALANCE_HERO -> com.finora.R.drawable.mascot_greet     // «Привет!»
+    GuideStep.AI_INSIGHT -> com.finora.R.drawable.mascot_ai          // AI-помощник
+    GuideStep.FAB, GuideStep.GOALS_CREATE -> com.finora.R.drawable.mascot_excited
+    GuideStep.TX_BREAKDOWN -> com.finora.R.drawable.mascot_think      // график/анализ
+    GuideStep.SETTINGS_THEME -> com.finora.R.drawable.mascot_thumbsup // «ты готов!»
+    else -> com.finora.R.drawable.mascot_point                        // указывает/рассказывает
+}
+
+/**
+ * Mascot character «Алия» — loaded from a transparent PNG drawable.
+ * The images live in res/drawable-nodpi/mascot_*.png.
  */
 @Composable
-fun MascotGirl(modifier: Modifier = Modifier) {
+fun MascotGirl(
+    modifier: Modifier = Modifier,
+    @androidx.annotation.DrawableRes resId: Int = com.finora.R.drawable.mascot_greet
+) {
     androidx.compose.foundation.Image(
-        painter = androidx.compose.ui.res.painterResource(id = com.finora.R.drawable.mascot_aliya),
+        painter = androidx.compose.ui.res.painterResource(id = resId),
         contentDescription = "Алия — маскот приложения",
         modifier = modifier,
         contentScale = androidx.compose.ui.layout.ContentScale.Fit,

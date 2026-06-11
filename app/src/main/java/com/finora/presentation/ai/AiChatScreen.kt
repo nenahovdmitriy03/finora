@@ -1,6 +1,7 @@
 package com.finora.presentation.ai
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -45,6 +47,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.AnnotatedString
@@ -120,6 +125,20 @@ fun AiChatScreen(
                 return@Column
             }
 
+            if (state.messages.isEmpty() && !state.loading && state.error == null) {
+                AiEmptyState(modifier = Modifier.weight(1f).fillMaxWidth())
+                InputBar(
+                    value = input,
+                    onValueChange = { input = it },
+                    enabled = !state.loading,
+                    onSend = {
+                        viewModel.send(input)
+                        input = ""
+                    }
+                )
+                return@Column
+            }
+
             LazyColumn(
                 modifier = Modifier
                     .weight(1f)
@@ -156,6 +175,36 @@ fun AiChatScreen(
                 }
             )
         }
+    }
+}
+
+@Composable
+private fun AiEmptyState(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Image(
+            painter = painterResource(id = com.finora.R.drawable.mascot_ai),
+            contentDescription = "Алия — AI-ассистент",
+            modifier = Modifier.height(200.dp),
+            contentScale = ContentScale.Fit
+        )
+        Spacer(Modifier.height(16.dp))
+        Text(
+            "Привет! Я Алия — твой AI-ассистент.",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Спроси меня про свои расходы, доходы и цели — или загрузи чек по кнопке камеры сверху, и я добавлю операции.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
     }
 }
 

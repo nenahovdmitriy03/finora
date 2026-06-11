@@ -1,5 +1,6 @@
 package com.finora.presentation.auth
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.finora.data.preferences.SettingsRepository
@@ -63,15 +64,27 @@ class AuthViewModel(
                 if (s.isLogin) {
                     // ─── Login flow ──────────────────────────────────────
                     authRepo.signIn(s.email, s.password)
-                    _state.value = _state.value.copy(
-                        isLoading = true,
-                        info = "Загрузка данных из облака…"
-                    )
                     val userId = authRepo.currentUserId()
                     if (userId != null) {
-                        // Download cloud data → overwrites Room with user's data.
-                        // If remote is empty (new account, no data), Room stays seeded.
-                        syncManager.downloadAll(userId)
+                        // Step 1: Try to download cloud data
+                        _state.value = _state.value.copy(
+                            isLoading = true,
+                            info = "Загрузка данных из облака…"
+                        )
+                        val hadRemoteData = syncManager.downloadAll(userId)
+
+                        if (!hadRemoteData) {
+                            // Step 2: Remote was empty → push local data to cloud.
+                            // This covers:
+                            //   • User registered with email confirmation (upload never ran)
+                            //   • User's cloud data was lost
+                            //   • First login on a device that already has local data
+                            Log.d("AuthVM", "Remote empty after login — uploading local data")
+                            _state.value = _state.value.copy(
+                                info = "Сохранение данных в облако…"
+                            )
+                            syncManager.uploadAll(userId)
+                        }
                     }
                     _state.value = _state.value.copy(isLoading = false, info = null, success = true)
                 } else {
@@ -83,17 +96,20 @@ class AuthViewModel(
                             isLoading = true,
                             info = "Сохранение данных в облако…"
                         )
-                        // Upload local data to cloud for the first time.
                         syncManager.uploadAll(userId)
                         _state.value = _state.value.copy(isLoading = false, info = null, success = true)
                     } else {
+                        // Email confirmation required — upload will happen on first login
+                        // (the login flow detects empty remote and uploads)
                         _state.value = _state.value.copy(
                             isLoading = false,
-                            info = "Письмо для подтверждения отправлено на ${s.email}. Проверьте почту и перейдите по ссылке, затем нажмите «Войти»."
+                            info = "Письмо для подтверждения отправлено на ${s.email}. " +
+                                    "Проверьте почту и перейдите по ссылке, затем нажмите «Войти»."
                         )
                     }
                 }
             } catch (e: Exception) {
+                Log.e("AuthVM", "Auth error", e)
                 val msg = translateError(e.message)
                 _state.value = _state.value.copy(isLoading = false, info = null, error = msg)
             }

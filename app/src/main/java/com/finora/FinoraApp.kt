@@ -1,6 +1,7 @@
 package com.finora
 
 import android.app.Application
+import android.util.Log
 import com.finora.di.AppContainer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -18,15 +19,19 @@ class FinoraApp : Application() {
         super.onCreate()
         container = AppContainer(this)
         appScope.launch {
+            // 1. Seed defaults (fast — only if Room is empty)
             container.repository.ensureSeeded()
-            // Pay out any due interest on savings accounts.
+            // 2. Accrue interest on savings accounts
             container.repository.applyInterestAccruals()
+            // 3. If user is authenticated, schedule a background upload.
+            //    This is safe: SyncManager uses a Mutex, so this upload
+            //    won't conflict with any download in AuthViewModel.
+            //    It ensures data gets backed up on every app start.
+            val userId = container.authRepository.currentUserId()
+            if (userId != null) {
+                Log.d("FinoraApp", "User authenticated ($userId) — scheduling background sync")
+                container.syncManager.scheduleUpload(userId)
+            }
         }
-        // NOTE: Auto-upload on start was REMOVED — it raced with downloadAll()
-        // during login on fresh install, deleting remote data before download
-        // could fetch it. Sync to cloud now happens:
-        //   • On registration (AuthViewModel)
-        //   • Before sign-out (SettingsViewModel)
-        //   • After data changes (debounced in SyncManager)
     }
 }

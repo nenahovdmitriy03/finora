@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -61,6 +62,7 @@ import com.finora.presentation.AppViewModelProvider
 @Composable
 fun AiChatScreen(
     onBack: () -> Unit,
+    onScan: () -> Unit = {},
     viewModel: AiChatViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -94,6 +96,9 @@ fun AiChatScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onScan) {
+                        Icon(Icons.Rounded.PhotoCamera, contentDescription = "Сканировать чек")
+                    }
                     if (state.configured && state.messages.isNotEmpty()) {
                         TextButton(onClick = { viewModel.clear() }) { Text("Новый анализ") }
                     }

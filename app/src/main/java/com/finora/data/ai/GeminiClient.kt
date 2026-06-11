@@ -1,7 +1,9 @@
 package com.finora.data.ai
 
+import android.graphics.Bitmap
 import com.finora.BuildConfig
 import com.google.ai.client.generativeai.GenerativeModel
+import com.google.ai.client.generativeai.type.content
 
 /**
  * Thin wrapper around the Gemini API. The key is injected at build time from
@@ -23,6 +25,15 @@ class GeminiClient(
     override suspend fun generate(prompt: String): String {
         val response = model.generateContent(prompt)
         return response.text?.trim().orEmpty()
+    }
+
+    /** Vision: sends [bitmap] together with [prompt] and returns the plain-text reply. */
+    suspend fun describeImage(bitmap: Bitmap, prompt: String): String {
+        val input = content {
+            image(bitmap)
+            text(prompt)
+        }
+        return model.generateContent(input).text?.trim().orEmpty()
     }
 
     companion object {

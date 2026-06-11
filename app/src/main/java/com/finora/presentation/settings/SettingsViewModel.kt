@@ -51,6 +51,16 @@ class SettingsViewModel(
         viewModelScope.launch { settings.setAccentColor(accent) }
     }
 
+    /**
+     * Lets a user who is browsing without an account go to the auth screen.
+     * Clearing the "auth skipped" flag makes the nav host route to Auth.
+     * Local data is preserved and will be uploaded to the cloud once the
+     * user registers / logs in (handled by AuthViewModel).
+     */
+    fun goToRegister() {
+        viewModelScope.launch { settings.setAuthSkipped(false) }
+    }
+
     fun signOut() {
         viewModelScope.launch {
             _isSigningOut.value = true

@@ -17,6 +17,9 @@ import kotlinx.coroutines.flow.Flow
 /** Lightweight POJO for aggregated balance deltas per account. */
 data class BalanceDelta(val accountId: Long, val delta: Double)
 
+/** Aggregated total amount per transaction type (INCOME / EXPENSE). */
+data class TypeTotal(val type: String, val total: Double)
+
 // ─── Accounts ────────────────────────────────────────────────────────────────
 
 @Dao
@@ -75,6 +78,20 @@ interface CategoryDao {
 interface TransactionDao {
     @Query("SELECT * FROM transactions ORDER BY date DESC, id DESC")
     fun observeAll(): Flow<List<TransactionEntity>>
+
+    /** Most recent N transactions — for the home screen preview (avoids loading all rows). */
+    @Query("SELECT * FROM transactions ORDER BY date DESC, id DESC LIMIT :limit")
+    fun observeRecent(limit: Int): Flow<List<TransactionEntity>>
+
+    /**
+     * Income / expense totals since [since], aggregated in SQL.
+     * Used by the home screen instead of summing all rows in memory.
+     */
+    @Query(
+        "SELECT type, COALESCE(SUM(amount), 0) AS total " +
+            "FROM transactions WHERE date >= :since GROUP BY type"
+    )
+    fun observeTotalsSince(since: Long): Flow<List<TypeTotal>>
 
     @Query("SELECT * FROM transactions WHERE date BETWEEN :from AND :to ORDER BY date DESC, id DESC")
     fun observeBetween(from: Long, to: Long): Flow<List<TransactionEntity>>

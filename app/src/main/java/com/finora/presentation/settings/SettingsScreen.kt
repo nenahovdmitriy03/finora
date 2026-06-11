@@ -146,11 +146,45 @@ fun SettingsScreen(
                 }
             } else {
                 FinoraCard {
-                    Text(
-                        "Вы используете приложение без аккаунта. Данные хранятся только на устройстве.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Rounded.Cloud,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            Spacer(Modifier.width(14.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "Войдите, чтобы сохранить данные",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                                Text(
+                                    "Сейчас данные хранятся только на устройстве. " +
+                                        "Создайте аккаунт — и они будут в облаке, " +
+                                        "доступны на всех устройствах.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(16.dp))
+                        Button(
+                            onClick = { viewModel.goToRegister() },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Войти или зарегистрироваться")
+                        }
+                    }
                 }
             }
         }

@@ -6,11 +6,12 @@ import com.finora.data.repository.FinanceRepository
 import com.finora.domain.model.AccountBalance
 import com.finora.domain.model.Goal
 import com.finora.domain.model.TransactionDetails
-import com.finora.domain.model.TransactionType
 import com.finora.presentation.util.startOfMonth
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 
 data class HomeUiState(
@@ -28,28 +29,33 @@ data class HomeUiState(
 
 class HomeViewModel(repository: FinanceRepository) : ViewModel() {
 
+    // Start of the current month (used for income/expense aggregates).
+    private val monthStart = startOfMonth(System.currentTimeMillis())
+
     val uiState: StateFlow<HomeUiState> = combine(
         repository.observeAccountBalances(),
-        repository.observeTransactionDetails(),
+        // Only the 5 most recent transactions are loaded — not the whole table.
+        repository.observeRecentTransactionDetails(5),
+        // Income/expense totals are aggregated in SQL, not summed in memory.
+        repository.observeMonthTotals(monthStart),
         repository.observeGoals()
-    ) { accounts, transactions, goals ->
-        val monthStart = startOfMonth(System.currentTimeMillis())
-        val monthTx = transactions.filter { it.transaction.date >= monthStart }
+    ) { accounts, recent, totals, goals ->
         HomeUiState(
             totalBalance = accounts.sumOf { it.balance },
             inGoals = goals.sumOf { it.savedAmount },
-            monthIncome = monthTx.filter { it.transaction.type == TransactionType.INCOME }
-                .sumOf { it.transaction.amount },
-            monthExpense = monthTx.filter { it.transaction.type == TransactionType.EXPENSE }
-                .sumOf { it.transaction.amount },
+            monthIncome = totals.income,
+            monthExpense = totals.expense,
             accounts = accounts,
-            recentTransactions = transactions.take(5),
+            recentTransactions = recent,
             goals = goals.take(3),
             loading = false
         )
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = HomeUiState()
-    )
+    }
+        // Run all merging/aggregation off the main thread to keep the UI smooth.
+        .flowOn(Dispatchers.Default)
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = HomeUiState()
+        )
 }

@@ -11,10 +11,12 @@ import com.finora.presentation.util.endOfMonth
 import com.finora.presentation.util.formatMonthYear
 import com.finora.presentation.util.startOfDay
 import com.finora.presentation.util.startOfMonth
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -89,11 +91,14 @@ class TransactionsViewModel(private val repository: FinanceRepository) : ViewMod
             expenseStats = buildStats(monthTx, TransactionType.EXPENSE, monthExpense),
             incomeStats = buildStats(monthTx, TransactionType.INCOME, monthIncome)
         )
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = TransactionsUiState()
-    )
+    }
+        // Grouping + stats over all transactions is heavy — keep it off the main thread.
+        .flowOn(Dispatchers.Default)
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = TransactionsUiState()
+        )
 
     private fun buildStats(
         txs: List<TransactionDetails>,

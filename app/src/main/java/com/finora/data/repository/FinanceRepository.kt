@@ -21,6 +21,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import java.util.Calendar
 
+/** Aggregated income / expense totals for a period (e.g. the current month). */
+data class MonthTotals(val income: Double, val expense: Double)
+
 /**
  * Single source of truth for all finance data. Reads return [Flow]s of domain
  * models, writes are suspend functions.
@@ -121,6 +124,42 @@ class FinanceRepository(
                     account = accMap[tx.accountId]?.toDomain()
                 )
             }
+        }
+
+    /**
+     * Recent transaction details (with category + account), limited to [limit] rows.
+     * Efficient alternative to [observeTransactionDetails] for the home preview —
+     * only loads the N newest rows instead of the entire table.
+     */
+    fun observeRecentTransactionDetails(limit: Int): Flow<List<TransactionDetails>> =
+        combine(
+            transactionDao.observeRecent(limit),
+            categoryDao.observeAll(),
+            accountDao.observeAll()
+        ) { txs, cats, accs ->
+            val catMap = cats.associateBy { it.id }
+            val accMap = accs.associateBy { it.id }
+            txs.map { tx ->
+                TransactionDetails(
+                    transaction = tx.toDomain(),
+                    category = tx.categoryId?.let { catMap[it]?.toDomain() },
+                    account = accMap[tx.accountId]?.toDomain()
+                )
+            }
+        }
+
+    /** Income / expense totals since [since], aggregated in SQL (no in-memory summation). */
+    fun observeMonthTotals(since: Long): Flow<MonthTotals> =
+        transactionDao.observeTotalsSince(since).map { rows ->
+            var income = 0.0
+            var expense = 0.0
+            for (r in rows) {
+                when (r.type) {
+                    TransactionType.INCOME.name -> income += r.total
+                    TransactionType.EXPENSE.name -> expense += r.total
+                }
+            }
+            MonthTotals(income, expense)
         }
 
     fun observeTransactionsBetween(from: Long, to: Long): Flow<List<Transaction>> =
@@ -338,165 +377,17 @@ class FinanceRepository(
 
     // ─── Seeding ─────────────────────────────────────────────────────────────
 
+    /**
+     * Seeds only the default categories on first launch.
+     *
+     * NOTE: No demo accounts / goals / transactions are seeded — new users
+     * start with a clean slate and add their own data. (The previous version
+     * generated fake "Тинькофф Блэк", "Сбербанк Премьер" etc. for store
+     * screenshots; that has been removed.)
+     */
     suspend fun ensureSeeded() {
         if (categoryDao.count() == 0) {
             categoryDao.insertAll(DefaultData.categories())
-        }
-        val currentAccounts = accountDao.getAll()
-        if (currentAccounts.isEmpty() || (currentAccounts.size == 1 && currentAccounts[0].initialBalance == 0.0)) {
-            // Delete existing default accounts to clean up
-            for (acc in currentAccounts) {
-                accountDao.delete(acc)
-            }
-            
-            // Seed premium accounts
-            val tinkoffId = accountDao.upsert(
-                Account(
-                    name = "Тинькофф Блэк",
-                    type = com.finora.domain.model.AccountType.CARD,
-                    initialBalance = 43250.0,
-                    color = 0xFFFDCB6E,
-                    iconKey = "card"
-                ).toEntity()
-            )
-            val sberId = accountDao.upsert(
-                Account(
-                    name = "Сбербанк Премьер",
-                    type = com.finora.domain.model.AccountType.CARD,
-                    initialBalance = 152000.0,
-                    color = 0xFF0984E3,
-                    iconKey = "card"
-                ).toEntity()
-            )
-            val cashId = accountDao.upsert(
-                Account(
-                    name = "Наличные",
-                    type = com.finora.domain.model.AccountType.CASH,
-                    initialBalance = 4500.0,
-                    color = 0xFF2FA86A,
-                    iconKey = "cash"
-                ).toEntity()
-            )
-            val savingsId = accountDao.upsert(
-                Account(
-                    name = "Накопительный 12%",
-                    type = com.finora.domain.model.AccountType.SAVINGS,
-                    initialBalance = 300000.0,
-                    color = 0xFFE84393,
-                    iconKey = "savings",
-                    interestRate = 12.0,
-                    interestPeriod = com.finora.domain.model.InterestPeriod.MONTHLY,
-                    interestPayoutDay = 1
-                ).toEntity()
-            )
-
-            // Seed premium goals
-            val baliGoalId = goalDao.upsert(
-                Goal(
-                    name = "Отпуск на Бали",
-                    targetAmount = 250000.0,
-                    savedAmount = 120000.0,
-                    iconKey = "flight",
-                    color = 0xFF0984E3
-                ).toEntity()
-            )
-            val macGoalId = goalDao.upsert(
-                Goal(
-                    name = "Новый MacBook Pro",
-                    targetAmount = 200000.0,
-                    savedAmount = 90000.0,
-                    iconKey = "laptop",
-                    color = 0xFFE84393
-                ).toEntity()
-            )
-
-            // Record goal contributions
-            goalContributionDao.insert(
-                GoalContribution(goalId = baliGoalId, accountId = savingsId, amount = 120000.0, date = System.currentTimeMillis()).toEntity()
-            )
-            goalContributionDao.insert(
-                GoalContribution(goalId = macGoalId, accountId = tinkoffId, amount = 90000.0, date = System.currentTimeMillis()).toEntity()
-            )
-
-            // Find categories for transactions
-            val cats = categoryDao.getAll()
-            val catProducts = cats.find { it.name == "Продукты" }?.id
-            val catCafe = cats.find { it.name == "Кафе и рестораны" }?.id
-            val catTransport = cats.find { it.name == "Транспорт" }?.id
-            val catRent = cats.find { it.name == "Жильё" }?.id
-            val catSalary = cats.find { it.name == "Зарплата" }?.id
-            val catSub = cats.find { it.name == "Подписки" }?.id
-
-            val now = System.currentTimeMillis()
-            val dayMs = 86400000L
-
-            // Seed transactions
-            transactionDao.upsert(
-                Transaction(
-                    amount = 1420.0,
-                    type = TransactionType.EXPENSE,
-                    accountId = tinkoffId,
-                    categoryId = catProducts,
-                    note = "Супермаркет ВкусВилл",
-                    date = now - 2 * 3600 * 1000,
-                    createdAt = now
-                ).toEntity()
-            )
-            transactionDao.upsert(
-                Transaction(
-                    amount = 450.0,
-                    type = TransactionType.EXPENSE,
-                    accountId = tinkoffId,
-                    categoryId = catCafe,
-                    note = "Кофейня Surf Coffee",
-                    date = now - 5 * 3600 * 1000,
-                    createdAt = now
-                ).toEntity()
-            )
-            transactionDao.upsert(
-                Transaction(
-                    amount = 380.0,
-                    type = TransactionType.EXPENSE,
-                    accountId = tinkoffId,
-                    categoryId = catTransport,
-                    note = "Яндекс Такси",
-                    date = now - dayMs,
-                    createdAt = now
-                ).toEntity()
-            )
-            transactionDao.upsert(
-                Transaction(
-                    amount = 299.0,
-                    type = TransactionType.EXPENSE,
-                    accountId = tinkoffId,
-                    categoryId = catSub,
-                    note = "Яндекс Плюс",
-                    date = now - 2 * dayMs,
-                    createdAt = now
-                ).toEntity()
-            )
-            transactionDao.upsert(
-                Transaction(
-                    amount = 35000.0,
-                    type = TransactionType.EXPENSE,
-                    accountId = sberId,
-                    categoryId = catRent,
-                    note = "Аренда квартиры за июнь",
-                    date = now - 5 * dayMs,
-                    createdAt = now
-                ).toEntity()
-            )
-            transactionDao.upsert(
-                Transaction(
-                    amount = 115000.0,
-                    type = TransactionType.INCOME,
-                    accountId = sberId,
-                    categoryId = catSalary,
-                    note = "Основная зарплата",
-                    date = now - 5 * dayMs,
-                    createdAt = now
-                ).toEntity()
-            )
         }
     }
 }

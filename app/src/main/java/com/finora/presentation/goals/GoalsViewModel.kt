@@ -7,9 +7,11 @@ import com.finora.domain.model.AccountBalance
 import com.finora.domain.model.Goal
 import com.finora.domain.model.GoalAccountSummary
 import com.finora.domain.model.GoalContribution
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -54,7 +56,8 @@ class GoalsViewModel(private val repository: FinanceRepository) : ViewModel() {
                 .sortedByDescending { it.netAmount }
             GoalWithSources(goal = goal, sources = byAccount)
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    }.flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun saveGoal(
         id: Long,

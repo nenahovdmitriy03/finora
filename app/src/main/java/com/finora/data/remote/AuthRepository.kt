@@ -4,6 +4,7 @@ import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.status.SessionStatus
+import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -53,6 +54,18 @@ class AuthRepository(private val client: SupabaseClient) {
     /** Sign out. */
     suspend fun signOut() {
         client.auth.signOut()
+    }
+
+    /**
+     * Permanently delete the current auth user (the row in auth.users).
+     *
+     * The anon key can't touch auth.users directly, so this calls a Postgres
+     * function `delete_user()` that runs with elevated privileges (SECURITY
+     * DEFINER) and deletes auth.uid(). The function must exist in Supabase —
+     * see the SQL in the project docs. Throws if it isn't installed.
+     */
+    suspend fun deleteUser() {
+        client.postgrest.rpc("delete_user")
     }
 
     /** Current user ID or null. */

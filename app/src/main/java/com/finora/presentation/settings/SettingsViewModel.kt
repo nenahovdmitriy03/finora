@@ -153,7 +153,13 @@ class SettingsViewModel(
         _deleteStatus.value = DeleteStatus.Deleting
         viewModelScope.launch {
             try {
+                // 1. Remove the user's data rows from the cloud (also wipes local Room).
                 syncManager.deleteAllUserData(userId)
+                // 2. Delete the auth account itself so the email is freed and the
+                //    user can't simply log back in (this was the bug — only data
+                //    was removed before, the account survived).
+                authRepo.deleteUser()
+                // 3. End the local session and clear flags.
                 authRepo.signOut()
                 settings.clearOnboardingFlags()
                 settings.clearDataOwnerId()

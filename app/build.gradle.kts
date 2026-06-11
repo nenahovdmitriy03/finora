@@ -92,7 +92,8 @@ dependencies {
 
     implementation(libs.kotlinx.coroutines.android)
 
-    implementation(libs.generativeai)
+    // Gemini is called via REST (HttpURLConnection) in GeminiClient — we deliberately
+    // dropped the generativeai SDK because its Ktor 2.x clashed with supabase-kt's Ktor 3.x.
 
     // Supabase
     implementation(platform(libs.supabase.bom))

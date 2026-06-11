@@ -49,6 +49,9 @@ interface AccountDao {
 interface CategoryDao {
     @Query("SELECT * FROM categories ORDER BY isDefault DESC, name ASC")
     fun observeAll(): Flow<List<CategoryEntity>>
+    
+    @Query("SELECT * FROM categories")
+    suspend fun getAll(): List<CategoryEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(category: CategoryEntity): Long

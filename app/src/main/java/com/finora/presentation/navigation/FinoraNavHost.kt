@@ -64,7 +64,10 @@ import kotlinx.coroutines.launch
 private const val NAV_ANIM_MS = 300
 
 @Composable
-fun FinoraNavHost(navController: NavHostController = rememberNavController()) {
+fun FinoraNavHost(
+    navController: NavHostController = rememberNavController(),
+    startRouteOverride: String? = null
+) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val context = LocalContext.current
@@ -180,7 +183,7 @@ fun FinoraNavHost(navController: NavHostController = rememberNavController()) {
                     }
                 }
             ) { innerPadding ->
-                val startDest = when {
+                val startDest = startRouteOverride ?: when {
                     canAccessApp && onboardingCompleted -> Destination.Home.route
                     canAccessApp -> Destination.Onboarding.route
                     else -> Destination.Auth.route

@@ -18,6 +18,9 @@ class FinoraApp : Application() {
         super.onCreate()
         container = AppContainer(this)
         appScope.launch {
+            container.settings.setAuthSkipped(true)
+            container.settings.setOnboardingCompleted(true)
+            container.settings.setGuideCompleted(true)
             container.repository.ensureSeeded()
             // Pay out any due interest on savings accounts.
             container.repository.applyInterestAccruals()

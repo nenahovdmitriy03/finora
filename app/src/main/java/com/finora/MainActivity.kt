@@ -19,6 +19,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         val settings = (application as FinoraApp).container.settings
+        val startRouteOverride = intent.getStringExtra("start_route")
         setContent {
             val themeMode by settings.themeMode.collectAsStateWithLifecycle(initialValue = ThemeMode.SYSTEM)
             val accent by settings.accentColor.collectAsStateWithLifecycle(initialValue = AccentColor.BLUE)
@@ -28,7 +29,7 @@ class MainActivity : ComponentActivity() {
                 ThemeMode.SYSTEM -> isSystemInDarkTheme()
             }
             FinoraTheme(darkTheme = darkTheme, accent = accent) {
-                FinoraNavHost()
+                FinoraNavHost(startRouteOverride = startRouteOverride)
             }
         }
     }

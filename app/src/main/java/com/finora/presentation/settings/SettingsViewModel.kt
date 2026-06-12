@@ -126,23 +126,33 @@ class SettingsViewModel(
     fun signOut() {
         viewModelScope.launch {
             _isSigningOut.value = true
-            // Upload with 8s timeout — don't block sign-out if network is slow
-            try {
-                val userId = authRepo.currentUserId()
-                if (userId != null) {
-                    withTimeoutOrNull(8_000L) {
+            // Cancel any queued debounced upload so it can't fire AFTER we wipe
+            // local data below and destroy the cloud copy.
+            syncManager.cancelPendingUpload()
+            // Push local → cloud before wiping. If this FAILS (e.g. no network /
+            // geo-block), we must NOT clear local data afterwards, otherwise the
+            // user loses everything. Keep local; it re-syncs on next login.
+            var uploadOk = true
+            val userId = authRepo.currentUserId()
+            if (userId != null) {
+                uploadOk = try {
+                    withTimeoutOrNull(15_000L) {
                         syncManager.uploadAll(userId)
-                    }
-                }
-            } catch (_: Exception) { }
+                    } != null
+                } catch (_: Exception) { false }
+            }
             authRepo.signOut()
             settings.clearOnboardingFlags()
             settings.clearDataOwnerId()
-            // Wipe local data so the next account that logs in starts clean
-            // and the previous user's data can't leak across accounts.
-            try {
-                syncManager.clearLocalData()
-            } catch (_: Exception) { }
+            // Only wipe local when the cloud copy is confirmed up to date. If the
+            // upload didn't succeed, KEEP local data to avoid loss. (Cross-account
+            // leak is still prevented: the login flow clears local when a different
+            // account signs in.)
+            if (uploadOk) {
+                try {
+                    syncManager.clearLocalData()
+                } catch (_: Exception) { }
+            }
             _isSigningOut.value = false
         }
     }

@@ -140,6 +140,16 @@ class SyncManager(
         }
     }
 
+    /**
+     * Cancels any pending debounced upload. MUST be called before wiping local
+     * data (sign-out / account switch / delete) — otherwise a queued [uploadAll]
+     * could fire after the local DB is cleared and destroy the cloud copy.
+     */
+    fun cancelPendingUpload() {
+        pendingUploadJob?.cancel()
+        pendingUploadJob = null
+    }
+
     // ─── Upload (Room → Supabase) ────────────────────────────────────────
 
     /**
@@ -152,6 +162,26 @@ class SyncManager(
             Log.d(TAG, "uploadAll START for user=$userId")
             val pg = client.postgrest
 
+            // 0. Load ALL local data up front so we can guard against data loss.
+            val localAccounts = db.accountDao().getAll()
+            val localCategories = db.categoryDao().observeAll().first()
+            val localTx = db.transactionDao().observeAll().first()
+            val localGoals = db.goalDao().observeAll().first()
+            val localContribs = db.goalContributionDao().observeAll().first()
+            val localTransfers = db.transferDao().observeAll().first()
+
+            // SAFETY GUARD: never let an empty local DB wipe a populated cloud.
+            // Categories alone are auto-seeded defaults and don't count as real data.
+            // Previously a debounced upload firing right after sign-out/clearLocalData
+            // would DELETE every remote row → full data loss. Now an empty local simply
+            // refuses to push a destructive "delete everything" to the cloud.
+            val isEffectivelyEmpty = localAccounts.isEmpty() && localTx.isEmpty() &&
+                localGoals.isEmpty() && localContribs.isEmpty() && localTransfers.isEmpty()
+            if (isEffectivelyEmpty) {
+                Log.w(TAG, "uploadAll: local is empty — SKIPPING remote wipe to protect cloud")
+                return@withContext
+            }
+
             // 1. Delete existing remote data (reverse dependency order)
             pg.from("goal_contributions").delete { filter { eq("user_id", userId) } }
             pg.from("transfers").delete { filter { eq("user_id", userId) } }
@@ -162,7 +192,6 @@ class SyncManager(
             Log.d(TAG, "uploadAll: deleted old remote data")
 
             // 2. Upload accounts, build localId → UUID map
-            val localAccounts = db.accountDao().getAll()
             val accountMap = mutableMapOf<Long, String>()
 
             for (acc in localAccounts) {
@@ -180,7 +209,6 @@ class SyncManager(
             Log.d(TAG, "uploadAll: uploaded ${localAccounts.size} accounts")
 
             // 3. Upload categories, build localId → UUID map
-            val localCategories = db.categoryDao().observeAll().first()
             val categoryMap = mutableMapOf<Long, String>()
 
             for (cat in localCategories) {
@@ -194,7 +222,6 @@ class SyncManager(
             Log.d(TAG, "uploadAll: uploaded ${localCategories.size} categories")
 
             // 4. Upload transactions (remap accountId, categoryId)
-            val localTx = db.transactionDao().observeAll().first()
             var txCount = 0
             for (tx in localTx) {
                 val remoteAccId = accountMap[tx.accountId] ?: continue
@@ -210,7 +237,6 @@ class SyncManager(
             Log.d(TAG, "uploadAll: uploaded $txCount transactions")
 
             // 5. Upload goals, build localId → UUID map
-            val localGoals = db.goalDao().observeAll().first()
             val goalMap = mutableMapOf<Long, String>()
 
             for (goal in localGoals) {
@@ -226,7 +252,6 @@ class SyncManager(
             Log.d(TAG, "uploadAll: uploaded ${localGoals.size} goals")
 
             // 6. Upload goal contributions (remap goalId, accountId)
-            val localContribs = db.goalContributionDao().observeAll().first()
             var contribCount = 0
             for (c in localContribs) {
                 val remoteGoalId = goalMap[c.goalId] ?: continue
@@ -240,7 +265,6 @@ class SyncManager(
             }
 
             // 7. Upload transfers (remap fromAccountId, toAccountId)
-            val localTransfers = db.transferDao().observeAll().first()
             var transferCount = 0
             for (t in localTransfers) {
                 val remoteFromId = accountMap[t.fromAccountId] ?: continue
@@ -290,9 +314,14 @@ class SyncManager(
                     "${remoteGoals.size} goals, ${remoteContribs.size} contribs, " +
                     "${remoteTransfers.size} transfers")
 
-            // If remote is completely empty, don't wipe local data
-            if (remoteAccounts.isEmpty() && remoteCategories.isEmpty()) {
-                Log.w(TAG, "downloadAll: remote is EMPTY — keeping local data")
+            // Treat remote as authoritative ONLY if it has real data (accounts,
+            // transactions or goals). Categories alone are auto-seeded defaults and
+            // can be left behind by a half-finished/interrupted upload — in that case
+            // we must NOT clobber local data with a near-empty cloud.
+            val remoteHasRealData = remoteAccounts.isNotEmpty() ||
+                remoteTransactions.isNotEmpty() || remoteGoals.isNotEmpty()
+            if (!remoteHasRealData) {
+                Log.w(TAG, "downloadAll: remote has no real data — keeping local data")
                 return@withContext false
             }
 
@@ -389,6 +418,7 @@ class SyncManager(
      * app remains usable. Does NOT touch any remote data.
      */
     suspend fun clearLocalData() = syncMutex.withLock {
+        cancelPendingUpload()
         withContext(Dispatchers.IO) {
             Log.d(TAG, "clearLocalData: wiping local Room")
             db.clearAllTables()
@@ -404,6 +434,7 @@ class SyncManager(
      * Removes all remote data for [userId] and clears local Room tables.
      */
     suspend fun deleteAllUserData(userId: String) = syncMutex.withLock {
+        cancelPendingUpload()
         withContext(Dispatchers.IO) {
             Log.d(TAG, "deleteAllUserData for user=$userId")
             val pg = client.postgrest

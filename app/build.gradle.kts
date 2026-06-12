@@ -34,8 +34,10 @@ android {
         buildConfigField("String", "OPENROUTER_API_KEY", "\"${secret("OPENROUTER_API_KEY")}\"")
         buildConfigField("String", "GROQ_API_KEY", "\"${secret("GROQ_API_KEY")}\"")
 
-        // Supabase (public client credentials — safe to embed)
-        buildConfigField("String", "SUPABASE_URL", "\"https://krjmutiniswmrvpfugec.supabase.co\"")
+        // Supabase (public client credentials — safe to embed).
+        // Routed through our own reverse-proxy (api.nenahov.shop:8443 → Supabase)
+        // so the app works from regions where supabase.co is geo-blocked.
+        buildConfigField("String", "SUPABASE_URL", "\"https://api.nenahov.shop:8443\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"${secret("SUPABASE_ANON_KEY").ifEmpty { "sb_publishable_uO1JphgxNAoUocMP5smFsw_TuYmnxtu" }}\"")
     }
 

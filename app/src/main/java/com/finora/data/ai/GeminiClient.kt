@@ -65,8 +65,10 @@ class GeminiClient(
     private fun textPart(text: String): JSONObject = JSONObject().put("text", text)
 
     private suspend fun request(parts: JSONArray): String = withContext(Dispatchers.IO) {
+        // Via reverse-proxy (api.nenahov.shop:8443/gemini → generativelanguage.googleapis.com)
+        // to bypass regional geo-blocking of Google AI endpoints.
         val url = URL(
-            "https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$apiKey"
+            "https://api.nenahov.shop:8443/gemini/v1beta/models/$modelName:generateContent?key=$apiKey"
         )
         val conn = (url.openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"

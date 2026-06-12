@@ -42,7 +42,9 @@ object AiProviders {
     fun all(): List<AiEngine> = listOf(
         OpenAiCompatClient(
             apiKey = BuildConfig.OPENROUTER_API_KEY,
-            baseUrl = "https://openrouter.ai/api/v1",
+            // Via our reverse-proxy (api.nenahov.shop:8443/ai → openrouter.ai/api)
+            // to bypass regional geo-blocking.
+            baseUrl = "https://api.nenahov.shop:8443/ai/v1",
             // Several free models — if one is rate-limited (429), the next is tried.
             models = listOf(
                 "meta-llama/llama-3.3-70b-instruct:free",
@@ -55,7 +57,8 @@ object AiProviders {
         ),
         OpenAiCompatClient(
             apiKey = BuildConfig.GROQ_API_KEY,
-            baseUrl = "https://api.groq.com/openai/v1",
+            // Via reverse-proxy (api.nenahov.shop:8443/groq → api.groq.com/openai)
+            baseUrl = "https://api.nenahov.shop:8443/groq/v1",
             models = listOf("llama-3.3-70b-versatile", "llama-3.1-8b-instant"),
             label = "Groq"
         ),

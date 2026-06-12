@@ -150,6 +150,37 @@ class SyncManager(
         pendingUploadJob = null
     }
 
+    /**
+     * Post-login sync, launched on the SyncManager's own app-lifecycle [scope]
+     * so it SURVIVES the auth screen being torn down. The instant sign-in
+     * succeeds, the nav graph (observing auth sessionStatus) navigates to Home
+     * and cancels the AuthViewModel's scope — if the download ran there it would
+     * be cancelled mid-request (HTTP 499) and no data would load. Running it here
+     * decouples it from the UI lifecycle. Home observes Room, so rows appear as
+     * soon as the download writes them.
+     */
+    fun syncOnLogin(userId: String, isSwitchingAccount: Boolean) {
+        scope.launch {
+            try {
+                if (isSwitchingAccount) clearLocalData()
+                val hadRemote = downloadAll(userId)
+                if (!hadRemote && !isSwitchingAccount) {
+                    // Returning/unclaimed user with an empty cloud → back local up.
+                    uploadAll(userId)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "syncOnLogin failed", e)
+            }
+        }
+    }
+
+    /** Fire-and-forget upload on the app-lifecycle scope (used after registration). */
+    fun uploadInBackground(userId: String) {
+        scope.launch {
+            try { uploadAll(userId) } catch (e: Exception) { Log.e(TAG, "uploadInBackground failed", e) }
+        }
+    }
+
     // ─── Upload (Room → Supabase) ────────────────────────────────────────
 
     /**

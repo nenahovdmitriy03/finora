@@ -70,34 +70,18 @@ class AuthViewModel(
                         val owner = settings.dataOwnerId()
                         val switchingAccount = owner != null && owner != userId
 
-                        // If the local data belongs to a DIFFERENT account, wipe it
-                        // first so it can't leak into this account.
-                        if (switchingAccount) {
-                            Log.d("AuthVM", "Different account ($owner → $userId) — clearing local data")
-                            _state.value = _state.value.copy(info = "Подготовка…")
-                            syncManager.clearLocalData()
-                        }
-
-                        // Cloud is the source of truth — always download this user's data.
-                        _state.value = _state.value.copy(
-                            isLoading = true,
-                            info = "Загрузка данных из облака…"
-                        )
-                        val hadRemoteData = syncManager.downloadAll(userId)
-
-                        if (!hadRemoteData && !switchingAccount) {
-                            // Remote empty AND local data is this user's (or unclaimed,
-                            // e.g. registered with email confirmation / used app without
-                            // an account) → push local data up to claim/back it up.
-                            Log.d("AuthVM", "Remote empty — uploading local data for $userId")
-                            _state.value = _state.value.copy(info = "Сохранение данных в облако…")
-                            syncManager.uploadAll(userId)
-                        }
-                        // else (switchingAccount && empty remote): genuinely new/empty
-                        // account on this device → keep the clean slate from clearLocalData().
-
-                        // Mark this user as the owner of the local data.
+                        // Mark ownership immediately — this must persist even though
+                        // the auth screen is about to be torn down by navigation.
                         settings.setDataOwnerId(userId)
+
+                        // Run the cloud sync on SyncManager's OWN scope (not here):
+                        // the moment sign-in succeeds the nav graph navigates to Home
+                        // and cancels this ViewModel's scope. A download running here
+                        // would be cancelled mid-request (499) and nothing would load.
+                        // syncOnLogin handles clear-on-switch, download, and the
+                        // empty-cloud upload, and Home observes Room so data appears
+                        // as soon as it's written.
+                        syncManager.syncOnLogin(userId, switchingAccount)
                     }
                     _state.value = _state.value.copy(isLoading = false, info = null, success = true)
                 } else {
@@ -110,12 +94,10 @@ class AuthViewModel(
                         if (owner != null && owner != userId) {
                             syncManager.clearLocalData()
                         }
-                        _state.value = _state.value.copy(
-                            isLoading = true,
-                            info = "Сохранение данных в облако…"
-                        )
-                        syncManager.uploadAll(userId)
+                        // Claim ownership now, then push local data up on the
+                        // app-lifecycle scope (navigation cancels this scope right after).
                         settings.setDataOwnerId(userId)
+                        syncManager.uploadInBackground(userId)
                         _state.value = _state.value.copy(isLoading = false, info = null, success = true)
                     } else {
                         // Email confirmation required — upload will happen on first login

@@ -250,7 +250,7 @@ fun GuideOverlay(
             // Mascot — emotion changes with the step
             Box(modifier = Modifier.offset { IntOffset(0, floatOffset.roundToInt()) }) {
                 MascotGirl(
-                    modifier = Modifier.size(width = 130.dp, height = 170.dp),
+                    modifier = Modifier.size(168.dp),
                     resId = emotionFor(step)
                 )
             }
@@ -325,12 +325,13 @@ fun GuideOverlay(
  */
 @androidx.annotation.DrawableRes
 fun emotionFor(step: Int): Int = when (step) {
-    GuideStep.BALANCE_HERO -> com.finora.R.drawable.mascot_greet     // «Привет!»
-    GuideStep.AI_INSIGHT -> com.finora.R.drawable.mascot_ai          // AI-помощник
-    GuideStep.FAB, GuideStep.GOALS_CREATE -> com.finora.R.drawable.mascot_excited
-    GuideStep.TX_BREAKDOWN -> com.finora.R.drawable.mascot_think      // график/анализ
-    GuideStep.SETTINGS_THEME -> com.finora.R.drawable.mascot_thumbsup // «ты готов!»
-    else -> com.finora.R.drawable.mascot_point                        // указывает/рассказывает
+    // Waist-up «до пояса» variants (open hoodie + black «Finora» tee), like onboarding.
+    GuideStep.BALANCE_HERO -> com.finora.R.drawable.mascot_half_greet     // «Привет!»
+    GuideStep.AI_INSIGHT -> com.finora.R.drawable.mascot_half_ai          // AI-помощник
+    GuideStep.FAB, GuideStep.GOALS_CREATE -> com.finora.R.drawable.mascot_half_excited
+    GuideStep.TX_BREAKDOWN -> com.finora.R.drawable.mascot_half_think      // график/анализ
+    GuideStep.SETTINGS_THEME -> com.finora.R.drawable.mascot_half_thumbsup // «ты готов!»
+    else -> com.finora.R.drawable.mascot_half_point                        // указывает/рассказывает
 }
 
 /**

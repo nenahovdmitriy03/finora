@@ -6,13 +6,15 @@ import com.finora.data.local.AppDatabase
 import com.finora.data.local.entity.AccountEntity
 import com.finora.data.local.entity.CategoryEntity
 import com.finora.data.local.entity.RecurringRuleEntity
+import com.finora.data.repository.FinanceRepository
+import com.finora.domain.model.Category
+import com.finora.domain.model.TransactionType
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class RecurringRulesUiState(
@@ -21,7 +23,10 @@ data class RecurringRulesUiState(
     val accounts: List<AccountEntity> = emptyList()
 )
 
-class RecurringRulesViewModel(private val db: AppDatabase) : ViewModel() {
+class RecurringRulesViewModel(
+    private val db: AppDatabase,
+    private val repository: FinanceRepository
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(RecurringRulesUiState())
     val uiState: StateFlow<RecurringRulesUiState> = _uiState.asStateFlow()
@@ -43,7 +48,8 @@ class RecurringRulesViewModel(private val db: AppDatabase) : ViewModel() {
         type: String,
         categoryId: Long,
         accountId: Long,
-        periodDays: Int
+        periodDays: Int,
+        startDateMillis: Long
     ) {
         viewModelScope.launch {
             db.recurringRuleDao().upsert(
@@ -54,10 +60,26 @@ class RecurringRulesViewModel(private val db: AppDatabase) : ViewModel() {
                     categoryId = categoryId,
                     accountId = accountId,
                     periodDays = periodDays,
-                    createdAt = System.currentTimeMillis()
+                    createdAt = startDateMillis
                 )
             )
         }
+    }
+
+    fun createCategory(name: String, iconKey: String, color: Long, type: TransactionType): Long {
+        var newId = 0L
+        viewModelScope.launch {
+            newId = repository.addCategory(
+                Category(
+                    name = name.trim(),
+                    type = type,
+                    iconKey = iconKey,
+                    color = color,
+                    isDefault = false
+                )
+            )
+        }
+        return newId
     }
 
     fun toggleRule(rule: RecurringRuleEntity) {

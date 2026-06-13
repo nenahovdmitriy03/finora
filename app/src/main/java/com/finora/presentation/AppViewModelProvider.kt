@@ -55,6 +55,6 @@ object AppViewModelProvider {
                 creationApp(this).container.settings
             )
         }
-        initializer { RecurringRulesViewModel(creationApp(this).container.db) }
+        initializer { RecurringRulesViewModel(creationApp(this).container.db, creationApp(this).container.repository) }
     }
 }

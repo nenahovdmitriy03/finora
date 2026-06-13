@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -76,6 +77,37 @@ fun TaxScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // ── Disclaimer ──────────────────────────────────────────────
+            item {
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Icon(
+                            Icons.Rounded.Warning,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            text = "Данные носят справочный характер и не являются точным расчётом. " +
+                                "Итоговая сумма вычета зависит от вашего дохода, статуса налогоплательщика и документов. " +
+                                "Для точного расчёта обратитесь в ФНС или к налоговому консультанту.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
+            }
+
             // ── Hero card with potential refund ──────────────────────────
             item {
                 Surface(
@@ -105,6 +137,12 @@ fun TaxScreen(
                             style = MaterialTheme.typography.displaySmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "≈ ориентировочная оценка",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f)
                         )
                         Spacer(Modifier.height(12.dp))
 
@@ -182,7 +220,7 @@ fun TaxScreen(
                 }
             }
 
-            // ── Info card ───────────────────────────────────────────────
+            // ── How it works ────────────────────────────────────────────
             item {
                 Surface(
                     shape = RoundedCornerShape(16.dp),
@@ -203,25 +241,27 @@ fun TaxScreen(
                         Spacer(Modifier.width(12.dp))
                         Column {
                             Text(
-                                text = "Как это работает?",
+                                text = "Что такое налоговый вычет?",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.SemiBold
                             )
                             Spacer(Modifier.height(4.dp))
                             Text(
-                                text = "По ст. 219 НК РФ можно вернуть 13% от расходов на лечение, обучение, спорт и страхование. " +
-                                    "Общий лимит социальных вычетов — 150 000 ₽/год (с 2024 г.).\n\n" +
-                                    "Максимальный возврат: 19 500 ₽/год.\n\n" +
-                                    "Finora автоматически находит подходящие категории в ваших расходах.",
+                                text = "По ст. 219 НК РФ государство возвращает 13% от расходов на лечение, " +
+                                    "обучение, спорт, страхование жизни и благотворительность.\n\n" +
+                                    "Общий лимит социальных вычетов — 150 000 ₽/год (с 2024 г.). " +
+                                    "Максимальный возврат: 19 500 ₽ в год.\n\n" +
+                                    "Вычет доступен официально трудоустроенным плательщикам НДФЛ 13%.",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 18.sp
                             )
                         }
                     }
                 }
             }
 
-            // ── Eligible categories hint ────────────────────────────────
+            // ── Eligible categories ─────────────────────────────────────
             item {
                 Surface(
                     shape = RoundedCornerShape(16.dp),
@@ -239,17 +279,112 @@ fun TaxScreen(
                         )
                         Spacer(Modifier.height(8.dp))
                         val hints = listOf(
-                            "🏥 Лечение, анализы, стоматология, медикаменты",
-                            "🎓 Обучение (своё, детей до 24 лет), курсы, автошкола",
-                            "🏋️ Фитнес, бассейн, спортивные секции",
-                            "🛡️ Страхование жизни (от 5 лет)",
-                            "❤️ Благотворительность (до 25% дохода)"
+                            "🏥 Лечение — приёмы врачей, анализы, стоматология, медикаменты по рецепту, ДМС",
+                            "🎓 Обучение — своё (любое), детей до 24 лет (очное), курсы, автошкола, вуз",
+                            "🏋️ Фитнес — абонемент в зал, бассейн, спортивные секции (организация из реестра Минспорта)",
+                            "🛡️ Страхование жизни — договор от 5 лет (не страхование имущества)",
+                            "❤️ Благотворительность — пожертвования НКО (до 25% годового дохода, отдельный лимит)"
                         )
                         hints.forEach { hint ->
                             Text(
                                 text = hint,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 17.sp,
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // ── Step-by-step: how to get the deduction ──────────────────
+            item {
+                Text(
+                    text = "Как оформить вычет",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            // Step 1
+            item { StepCard(
+                number = "1",
+                title = "Собери документы",
+                body = "• Справка 2-НДФЛ от работодателя (или данные в ЛК ФНС)\n" +
+                    "• Договор с клиникой / учебным заведением / фитнес-клубом\n" +
+                    "• Чеки и квитанции об оплате\n" +
+                    "• Лицензия организации (обычно есть на сайте)\n" +
+                    "• Для лечения: справка об оплате мед. услуг (форма из приказа ФНС)\n" +
+                    "• Для обучения детей: свидетельство о рождении, справка об очной форме"
+            )}
+
+            // Step 2
+            item { StepCard(
+                number = "2",
+                title = "Выбери способ оформления",
+                body = "Вариант А — через работодателя (быстрее):\n" +
+                    "  → Подай заявление в ЛК nalog.gov.ru → получи уведомление → " +
+                    "отнеси в бухгалтерию → с зарплаты перестанут удерживать НДФЛ\n\n" +
+                    "Вариант Б — через декларацию 3-НДФЛ (после конца года):\n" +
+                    "  → Заполни 3-НДФЛ в ЛК nalog.gov.ru или в приложении «Налоги ФЛ» → " +
+                    "приложи документы → подай декларацию → деньги вернут на счёт"
+            )}
+
+            // Step 3
+            item { StepCard(
+                number = "3",
+                title = "Подай онлайн через ЛК ФНС",
+                body = "1. Зайди на lkfl2.nalog.ru (Личный кабинет ФНС) через Госуслуги или по ИНН+пароль\n" +
+                    "2. Раздел «Жизненные ситуации» → «Подать декларацию 3-НДФЛ»\n" +
+                    "3. Заполни данные (доходы подтянутся автоматически из справок)\n" +
+                    "4. Выбери тип вычета (социальный) и внеси суммы расходов\n" +
+                    "5. Приложи сканы документов\n" +
+                    "6. Подпиши неквалифицированной ЭП (получается там же бесплатно)\n" +
+                    "7. Отправь — декларация уйдёт в налоговую"
+            )}
+
+            // Step 4
+            item { StepCard(
+                number = "4",
+                title = "Дождись проверки и получи деньги",
+                body = "• Камеральная проверка: до 3 месяцев\n" +
+                    "• После одобрения — подай заявление на возврат (если не подал ранее)\n" +
+                    "• Перевод на банковский счёт: до 1 месяца после заявления\n" +
+                    "• Итого: обычно 2–4 месяца от подачи до получения денег\n\n" +
+                    "Статус проверки можно отслеживать в ЛК ФНС."
+            )}
+
+            // ── Key links ───────────────────────────────────────────────
+            item {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        Text(
+                            "Полезные ресурсы",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        val links = listOf(
+                            "🌐 lkfl2.nalog.ru — Личный кабинет ФНС (подача 3-НДФЛ онлайн)",
+                            "📱 Приложение «Налоги ФЛ» — мобильная версия ЛК ФНС",
+                            "📞 8-800-222-22-22 — горячая линия ФНС (бесплатно)",
+                            "🏢 Ближайшая ИФНС — можно подать документы лично",
+                            "📋 gosuslugi.ru — вход в ЛК ФНС через подтверждённый аккаунт"
+                        )
+                        links.forEach { link ->
+                            Text(
+                                text = link,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 17.sp,
                                 modifier = Modifier.padding(vertical = 3.dp)
                             )
                         }
@@ -257,7 +392,107 @@ fun TaxScreen(
                 }
             }
 
+            // ── Important notes ─────────────────────────────────────────
+            item {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        Text(
+                            "⚠️ Важно помнить",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        val notes = listOf(
+                            "• Вычет можно получить за последние 3 года (например, в 2026 — за 2023–2025)",
+                            "• Возврат не может превышать сумму уплаченного НДФЛ за год",
+                            "• Дорогостоящее лечение (код 2) — без лимита 150 000 ₽",
+                            "• Вычет за обучение детей — отдельный лимит 110 000 ₽/год на ребёнка",
+                            "• Самозанятые на НПД не имеют права на вычет (нет НДФЛ 13%)",
+                            "• Сохраняй все чеки и договоры — они нужны для подтверждения"
+                        )
+                        notes.forEach { note ->
+                            Text(
+                                text = note,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 17.sp,
+                                modifier = Modifier.padding(vertical = 3.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // ── Bottom disclaimer ───────────────────────────────────────
+            item {
+                Text(
+                    text = "Информация носит ознакомительный характер и не является налоговой консультацией. " +
+                        "Суммы рассчитаны приблизительно на основе категорий расходов. " +
+                        "Для получения точного расчёта обратитесь в ФНС или к квалифицированному налоговому консультанту. " +
+                        "Finora не несёт ответственности за решения, принятые на основе этих данных.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    textAlign = TextAlign.Center,
+                    lineHeight = 14.sp,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
             item { Spacer(Modifier.height(24.dp)) }
+        }
+    }
+}
+
+@Composable
+private fun StepCard(number: String, title: String, body: String) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 1.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            // Step number badge
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = number,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = body,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 18.sp
+                )
+            }
         }
     }
 }
@@ -305,7 +540,7 @@ private fun DeductionRow(item: DeductionItem) {
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    text = "возврат ${formatMoney(item.spent * 0.13)}",
+                    text = "возврат ~${formatMoney(item.spent * 0.13)}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary
                 )

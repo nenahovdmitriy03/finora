@@ -65,7 +65,6 @@ fun HomeScreen(
     onOpenAi: () -> Unit,
     onOpenTransaction: (Long) -> Unit,
     onOpenTax: () -> Unit = {},
-    onOpenRecommendations: () -> Unit = {},
     viewModel: HomeViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -87,25 +86,14 @@ fun HomeScreen(
                 AiInsightCard(onOpenAi = onOpenAi)
             }
         }
-        // ── Tips row: Tax + Recommendations ──────────────────────────
+        // ── Tax deduction card ────────────────────────────────────────
         item {
-            Row(
+            TipMiniCard(
+                emoji = "💰",
+                label = "Налоговый вычет",
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                TipMiniCard(
-                    emoji = "💰",
-                    label = "Налоговый вычет",
-                    modifier = Modifier.weight(1f),
-                    onClick = onOpenTax
-                )
-                TipMiniCard(
-                    emoji = "🏦",
-                    label = "Вклады и карты",
-                    modifier = Modifier.weight(1f),
-                    onClick = onOpenRecommendations
-                )
-            }
+                onClick = onOpenTax
+            )
         }
         item {
             SectionHeader(

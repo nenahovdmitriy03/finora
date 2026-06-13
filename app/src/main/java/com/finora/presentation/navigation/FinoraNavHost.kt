@@ -60,7 +60,6 @@ import com.finora.presentation.home.HomeScreen
 import com.finora.presentation.onboarding.OnboardingScreen
 import com.finora.presentation.recurring.RecurringRulesScreen
 import com.finora.presentation.settings.SettingsScreen
-import com.finora.presentation.tips.RecommendationsScreen
 import com.finora.presentation.tips.TaxScreen
 import com.finora.presentation.transactions.TransactionsScreen
 import io.github.jan.supabase.auth.auth
@@ -270,15 +269,11 @@ fun FinoraNavHost(
                             onSeeGoals = { navController.navigate(Destination.Goals.route) },
                             onOpenAi = { navController.navigate(Destination.AiChat.route) },
                             onOpenTransaction = { id -> navController.navigate(Destination.AddTransaction.create(id)) },
-                            onOpenTax = { navController.navigate(Destination.TaxDeduction.route) },
-                            onOpenRecommendations = { navController.navigate(Destination.Recommendations.route) }
+                            onOpenTax = { navController.navigate(Destination.TaxDeduction.route) }
                         )
                     }
                     composable(Destination.TaxDeduction.route) {
                         TaxScreen(onBack = { navController.popBackStack() })
-                    }
-                    composable(Destination.Recommendations.route) {
-                        RecommendationsScreen(onBack = { navController.popBackStack() })
                     }
                     composable(Destination.Transactions.route) {
                         TransactionsScreen(

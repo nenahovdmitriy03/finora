@@ -18,6 +18,8 @@ sealed class Destination(val route: String) {
     data object AiChat : Destination("ai_chat")
     data object Scan : Destination("scan")
     data object RecurringRules : Destination("recurring_rules")
+    data object TaxDeduction : Destination("tax_deduction")
+    data object Recommendations : Destination("recommendations")
     data object AddTransaction : Destination("add_transaction?id={id}") {
         fun create(id: Long = -1L) = "add_transaction?id=$id"
         const val ARG_ID = "id"

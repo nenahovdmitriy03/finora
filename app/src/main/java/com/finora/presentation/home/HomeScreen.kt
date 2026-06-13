@@ -39,6 +39,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.finora.domain.model.AccountBalance
@@ -63,6 +64,8 @@ fun HomeScreen(
     onSeeGoals: () -> Unit,
     onOpenAi: () -> Unit,
     onOpenTransaction: (Long) -> Unit,
+    onOpenTax: () -> Unit = {},
+    onOpenRecommendations: () -> Unit = {},
     viewModel: HomeViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -82,6 +85,26 @@ fun HomeScreen(
         item {
             Box(modifier = Modifier.guideTarget(guideController, GuideStep.AI_INSIGHT)) {
                 AiInsightCard(onOpenAi = onOpenAi)
+            }
+        }
+        // ── Tips row: Tax + Recommendations ──────────────────────────
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                TipMiniCard(
+                    emoji = "💰",
+                    label = "Налоговый вычет",
+                    modifier = Modifier.weight(1f),
+                    onClick = onOpenTax
+                )
+                TipMiniCard(
+                    emoji = "🏦",
+                    label = "Вклады и карты",
+                    modifier = Modifier.weight(1f),
+                    onClick = onOpenRecommendations
+                )
             }
         }
         item {
@@ -397,6 +420,35 @@ private fun AccountsStrip(accounts: List<AccountBalance>, onOpen: () -> Unit) {
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun TipMiniCard(
+    emoji: String,
+    label: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = modifier.clickable(onClick = onClick),
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+        tonalElevation = 0.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(emoji, fontSize = 22.sp)
+            Spacer(Modifier.width(10.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
         }
     }
 }

@@ -14,6 +14,8 @@ import com.finora.presentation.home.HomeViewModel
 import com.finora.presentation.recurring.RecurringRulesViewModel
 import com.finora.presentation.scan.ScanReceiptViewModel
 import com.finora.presentation.settings.SettingsViewModel
+import com.finora.presentation.tips.RecommendationsViewModel
+import com.finora.presentation.tips.TaxViewModel
 import com.finora.presentation.transactions.TransactionsViewModel
 
 private fun creationApp(extras: androidx.lifecycle.viewmodel.CreationExtras): FinoraApp =
@@ -56,5 +58,7 @@ object AppViewModelProvider {
             )
         }
         initializer { RecurringRulesViewModel(creationApp(this).container.db, creationApp(this).container.repository) }
+        initializer { TaxViewModel(creationApp(this).container.repository) }
+        initializer { RecommendationsViewModel(creationApp(this).container.repository) }
     }
 }

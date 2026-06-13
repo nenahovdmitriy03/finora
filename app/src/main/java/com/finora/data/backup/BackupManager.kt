@@ -3,11 +3,16 @@ package com.finora.data.backup
 import android.util.Log
 import com.finora.data.local.AppDatabase
 import com.finora.data.local.entity.AccountEntity
+import com.finora.data.local.entity.BudgetEntity
 import com.finora.data.local.entity.CategoryEntity
+import com.finora.data.local.entity.ChallengeEntity
 import com.finora.data.local.entity.GoalContributionEntity
 import com.finora.data.local.entity.GoalEntity
 import com.finora.data.local.entity.RecurringRuleEntity
+import com.finora.data.local.entity.TagEntity
+import com.finora.data.local.entity.TemplateEntity
 import com.finora.data.local.entity.TransactionEntity
+import com.finora.data.local.entity.TransactionTagEntity
 import com.finora.data.local.entity.TransferEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -30,7 +35,7 @@ data class BackupData(
     /** Backup format version — bump when the schema changes. */
     val version: Int = 1,
     /** App data schema (Room) version this backup was taken at. */
-    val dbVersion: Int = 6,
+    val dbVersion: Int = 7,
     /** When the backup was created (epoch millis). */
     val exportedAt: Long = 0L,
     val accounts: List<AccountEntity> = emptyList(),
@@ -39,11 +44,17 @@ data class BackupData(
     val goals: List<GoalEntity> = emptyList(),
     val goalContributions: List<GoalContributionEntity> = emptyList(),
     val transfers: List<TransferEntity> = emptyList(),
-    val recurringRules: List<RecurringRuleEntity> = emptyList()
+    val recurringRules: List<RecurringRuleEntity> = emptyList(),
+    val budgets: List<BudgetEntity> = emptyList(),
+    val templates: List<TemplateEntity> = emptyList(),
+    val tags: List<TagEntity> = emptyList(),
+    val transactionTags: List<TransactionTagEntity> = emptyList(),
+    val challenges: List<ChallengeEntity> = emptyList()
 ) {
     val totalRecords: Int
         get() = accounts.size + categories.size + transactions.size +
-            goals.size + goalContributions.size + transfers.size + recurringRules.size
+            goals.size + goalContributions.size + transfers.size + recurringRules.size +
+            budgets.size + templates.size + tags.size + transactionTags.size + challenges.size
 }
 
 class BackupManager(private val db: AppDatabase) {
@@ -66,7 +77,12 @@ class BackupManager(private val db: AppDatabase) {
             goals = db.goalDao().getAll(),
             goalContributions = db.goalContributionDao().getAll(),
             transfers = db.transferDao().getAll(),
-            recurringRules = db.recurringRuleDao().getAll()
+            recurringRules = db.recurringRuleDao().getAll(),
+            budgets = db.budgetDao().getAll(),
+            templates = db.templateDao().getAll(),
+            tags = db.tagDao().getAll(),
+            transactionTags = db.transactionTagDao().getAll(),
+            challenges = db.challengeDao().getAll()
         )
         Log.d(TAG, "exportToJson: ${data.totalRecords} records")
         json.encodeToString(BackupData.serializer(), data)
@@ -98,6 +114,11 @@ class BackupManager(private val db: AppDatabase) {
         data.transfers.forEach { db.transferDao().upsert(it) }
         data.goalContributions.forEach { db.goalContributionDao().upsert(it) }
         data.recurringRules.forEach { db.recurringRuleDao().upsert(it) }
+        data.budgets.forEach { db.budgetDao().upsert(it) }
+        data.templates.forEach { db.templateDao().upsert(it) }
+        data.tags.forEach { db.tagDao().upsert(it) }
+        data.transactionTags.forEach { db.transactionTagDao().insert(it) }
+        data.challenges.forEach { db.challengeDao().upsert(it) }
 
         data
     }
@@ -105,7 +126,7 @@ class BackupManager(private val db: AppDatabase) {
     companion object {
         private const val TAG = "BackupManager"
         const val CURRENT_VERSION = 1
-        private const val DB_VERSION = 6
+        private const val DB_VERSION = 7
         /** Suggested file name for exported backups. */
         fun suggestedFileName(): String {
             val ts = java.text.SimpleDateFormat("yyyyMMdd_HHmm", java.util.Locale.US)

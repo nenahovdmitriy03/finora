@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.finora.domain.model.AccountBalance
+import com.finora.domain.model.BudgetProgress
 import com.finora.domain.model.Goal
 import com.finora.presentation.AppViewModelProvider
 import com.finora.presentation.components.EmptyState
@@ -65,6 +66,8 @@ fun HomeScreen(
     onOpenAi: () -> Unit,
     onOpenTransaction: (Long) -> Unit,
     onOpenTax: () -> Unit = {},
+    onOpenBudgets: () -> Unit = {},
+    onOpenChallenges: () -> Unit = {},
     viewModel: HomeViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -86,14 +89,38 @@ fun HomeScreen(
                 AiInsightCard(onOpenAi = onOpenAi)
             }
         }
-        // ── Tax deduction card ────────────────────────────────────────
+        // ── Quick-access mini-cards ──────────────────────────────────
         item {
-            TipMiniCard(
-                emoji = "💰",
-                label = "Налоговый вычет",
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                onClick = onOpenTax
-            )
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                TipMiniCard(
+                    emoji = "💰",
+                    label = "Вычет",
+                    modifier = Modifier.weight(1f),
+                    onClick = onOpenTax
+                )
+                TipMiniCard(
+                    emoji = "📊",
+                    label = "Бюджеты",
+                    modifier = Modifier.weight(1f),
+                    onClick = onOpenBudgets
+                )
+                TipMiniCard(
+                    emoji = "🏆",
+                    label = "Челленджи",
+                    modifier = Modifier.weight(1f),
+                    onClick = onOpenChallenges
+                )
+            }
+        }
+
+        // ── Budget alerts (if any over 80%) ─────────────────────────
+        if (state.budgetAlerts.isNotEmpty()) {
+            item {
+                BudgetAlertsCard(state.budgetAlerts, onClick = onOpenBudgets)
+            }
         }
         item {
             SectionHeader(
@@ -424,6 +451,65 @@ private fun TipMiniCard(
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface
             )
+        }
+    }
+}
+
+@Composable
+private fun BudgetAlertsCard(alerts: List<BudgetProgress>, onClick: () -> Unit) {
+    FinoraCard(modifier = Modifier.clickable { onClick() }) {
+        Text(
+            "⚠️ Бюджеты",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+        Spacer(Modifier.height(8.dp))
+        alerts.forEach { bp ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(vertical = 4.dp)
+            ) {
+                IconChip(
+                    iconKey = bp.category.iconKey,
+                    color = Color(bp.category.color),
+                    size = 32.dp
+                )
+                Spacer(Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        bp.category.name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    // Mini progress bar
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(bp.ratio.coerceIn(0f, 1f))
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(
+                                    if (bp.overBudget) Color(0xFFE07685) else Color(0xFFE8893A)
+                                )
+                        )
+                    }
+                }
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "${(bp.ratio * 100).toInt()}%",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (bp.overBudget) Color(0xFFE07685) else Color(0xFFE8893A)
+                )
+            }
         }
     }
 }

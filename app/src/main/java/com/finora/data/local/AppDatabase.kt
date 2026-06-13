@@ -5,18 +5,28 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.finora.data.local.dao.AccountDao
+import com.finora.data.local.dao.BudgetDao
 import com.finora.data.local.dao.CategoryDao
+import com.finora.data.local.dao.ChallengeDao
 import com.finora.data.local.dao.GoalContributionDao
 import com.finora.data.local.dao.GoalDao
 import com.finora.data.local.dao.RecurringRuleDao
+import com.finora.data.local.dao.TagDao
+import com.finora.data.local.dao.TemplateDao
 import com.finora.data.local.dao.TransactionDao
+import com.finora.data.local.dao.TransactionTagDao
 import com.finora.data.local.dao.TransferDao
 import com.finora.data.local.entity.AccountEntity
+import com.finora.data.local.entity.BudgetEntity
 import com.finora.data.local.entity.CategoryEntity
+import com.finora.data.local.entity.ChallengeEntity
 import com.finora.data.local.entity.GoalContributionEntity
 import com.finora.data.local.entity.GoalEntity
 import com.finora.data.local.entity.RecurringRuleEntity
+import com.finora.data.local.entity.TagEntity
+import com.finora.data.local.entity.TemplateEntity
 import com.finora.data.local.entity.TransactionEntity
+import com.finora.data.local.entity.TransactionTagEntity
 import com.finora.data.local.entity.TransferEntity
 
 @Database(
@@ -27,9 +37,14 @@ import com.finora.data.local.entity.TransferEntity
         GoalEntity::class,
         GoalContributionEntity::class,
         TransferEntity::class,
-        RecurringRuleEntity::class
+        RecurringRuleEntity::class,
+        BudgetEntity::class,
+        TemplateEntity::class,
+        TagEntity::class,
+        TransactionTagEntity::class,
+        ChallengeEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -40,18 +55,21 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun goalContributionDao(): GoalContributionDao
     abstract fun transferDao(): TransferDao
     abstract fun recurringRuleDao(): RecurringRuleDao
+    abstract fun budgetDao(): BudgetDao
+    abstract fun templateDao(): TemplateDao
+    abstract fun tagDao(): TagDao
+    abstract fun transactionTagDao(): TransactionTagDao
+    abstract fun challengeDao(): ChallengeDao
 
     companion object {
         const val NAME = "finora.db"
 
-        /** v2: add goals.linkedAccountId so a goal remembers which account funds it. */
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE goals ADD COLUMN linkedAccountId INTEGER")
             }
         }
 
-        /** v3: interest-bearing (savings) accounts with periodic capitalization. */
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE accounts ADD COLUMN interestRate REAL NOT NULL DEFAULT 0")
@@ -60,28 +78,14 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        /** v4: per-account interest payout time of day (minutes from midnight). */
         val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE accounts ADD COLUMN interestPayoutMinute INTEGER NOT NULL DEFAULT 540")
             }
         }
 
-        /**
-         * v5: goal contributions table, transfers table, monthly interest day-of-month.
-         *
-         * - [goal_contributions] tracks every deposit/withdrawal per-account
-         *   (fixes the single-linkedAccountId limitation).
-         * - [transfers] moves money between accounts without affecting income/expense stats.
-         * - [accounts.interestPayoutDay] lets the user pick which calendar day monthly
-         *   interest is paid.
-         *
-         * Migration also seeds goal_contributions from existing goals and restores
-         * account initialBalance that was previously reduced by contributeToGoal().
-         */
         val MIGRATION_4_5 = object : Migration(4, 5) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // 1. Create goal_contributions table
                 db.execSQL(
                     """CREATE TABLE IF NOT EXISTS goal_contributions (
                         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -94,7 +98,6 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_goal_contributions_goalId ON goal_contributions(goalId)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_goal_contributions_accountId ON goal_contributions(accountId)")
 
-                // 2. Create transfers table
                 db.execSQL(
                     """CREATE TABLE IF NOT EXISTS transfers (
                         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -110,20 +113,14 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_transfers_toAccountId ON transfers(toAccountId)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_transfers_date ON transfers(date)")
 
-                // 3. Add interest payout day column
                 db.execSQL("ALTER TABLE accounts ADD COLUMN interestPayoutDay INTEGER NOT NULL DEFAULT 1")
 
-                // 4. Migrate existing goal data → contribution records & restore balances.
-                //    We attribute the full savedAmount to the linkedAccountId. If a goal
-                //    was funded from multiple accounts (that's exactly the bug), the last-used
-                //    account gets the full credit. The user may need to adjust manually.
                 db.execSQL(
                     """INSERT INTO goal_contributions (goalId, accountId, amount, date)
                        SELECT id, linkedAccountId, savedAmount, createdAt
                        FROM goals
                        WHERE linkedAccountId IS NOT NULL AND savedAmount > 0"""
                 )
-                // Restore initialBalance on accounts that were debited for goals
                 db.execSQL(
                     """UPDATE accounts SET initialBalance = initialBalance + COALESCE(
                         (SELECT SUM(g.savedAmount) FROM goals g
@@ -132,7 +129,6 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        /** v6: recurring (auto) transaction rules. */
         val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -151,6 +147,76 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_recurring_rules_categoryId ON recurring_rules(categoryId)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_recurring_rules_accountId ON recurring_rules(accountId)")
+            }
+        }
+
+        /**
+         * v7: budgets, templates, tags, transaction_tags, challenges.
+         */
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Budgets
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS budgets (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        categoryId INTEGER NOT NULL,
+                        limitAmount REAL NOT NULL,
+                        periodDays INTEGER NOT NULL DEFAULT 30,
+                        createdAt INTEGER NOT NULL
+                    )"""
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_budgets_categoryId ON budgets(categoryId)")
+
+                // Templates
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS templates (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        name TEXT NOT NULL,
+                        amount REAL NOT NULL,
+                        type TEXT NOT NULL,
+                        categoryId INTEGER,
+                        accountId INTEGER,
+                        note TEXT NOT NULL DEFAULT '',
+                        createdAt INTEGER NOT NULL
+                    )"""
+                )
+
+                // Tags
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS tags (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        name TEXT NOT NULL,
+                        color INTEGER NOT NULL
+                    )"""
+                )
+
+                // Transaction ↔ Tag junction
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS transaction_tags (
+                        transactionId INTEGER NOT NULL,
+                        tagId INTEGER NOT NULL,
+                        PRIMARY KEY (transactionId, tagId)
+                    )"""
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_transaction_tags_transactionId ON transaction_tags(transactionId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_transaction_tags_tagId ON transaction_tags(tagId)")
+
+                // Challenges
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS challenges (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        title TEXT NOT NULL,
+                        description TEXT NOT NULL,
+                        emoji TEXT NOT NULL DEFAULT '🎯',
+                        targetDays INTEGER NOT NULL,
+                        targetAmount REAL,
+                        categoryId INTEGER,
+                        startDate INTEGER NOT NULL,
+                        endDate INTEGER NOT NULL,
+                        completed INTEGER NOT NULL DEFAULT 0,
+                        createdAt INTEGER NOT NULL
+                    )"""
+                )
             }
         }
     }

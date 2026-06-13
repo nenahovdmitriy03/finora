@@ -19,6 +19,9 @@ sealed class Destination(val route: String) {
 
     data object RecurringRules : Destination("recurring_rules")
     data object TaxDeduction : Destination("tax_deduction")
+    data object Budgets : Destination("budgets")
+    data object Templates : Destination("templates")
+    data object Challenges : Destination("challenges")
     data object AddTransaction : Destination("add_transaction?id={id}") {
         fun create(id: Long = -1L) = "add_transaction?id=$id"
         const val ARG_ID = "id"

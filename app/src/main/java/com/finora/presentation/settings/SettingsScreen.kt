@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material.icons.rounded.AccountBalanceWallet
+import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Cloud
@@ -80,6 +81,8 @@ import kotlinx.coroutines.withContext
 fun SettingsScreen(
     onOpenAccounts: () -> Unit,
     onOpenRecurring: () -> Unit = {},
+    onOpenBudgets: () -> Unit = {},
+    onOpenTemplates: () -> Unit = {},
     viewModel: SettingsViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
@@ -184,6 +187,20 @@ fun SettingsScreen(
                         title = "Автооперации",
                         subtitle = "Регулярные списания и пополнения",
                         onClick = onOpenRecurring
+                    )
+                    RowDivider()
+                    SettingRow(
+                        icon = Icons.Rounded.AccountBalanceWallet,
+                        title = "Бюджеты",
+                        subtitle = "Лимиты расходов по категориям",
+                        onClick = onOpenBudgets
+                    )
+                    RowDivider()
+                    SettingRow(
+                        icon = Icons.Rounded.Bolt,
+                        title = "Шаблоны",
+                        subtitle = "Быстрый ввод частых операций",
+                        onClick = onOpenTemplates
                     )
                     RowDivider()
                     SettingRow(

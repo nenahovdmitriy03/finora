@@ -128,7 +128,8 @@ data class Transfer(
 data class TransactionDetails(
     val transaction: Transaction,
     val category: Category?,
-    val account: Account?
+    val account: Account?,
+    val tags: List<Tag> = emptyList()
 )
 
 /** Aggregated spend/earn for one category, used by statistics. */
@@ -157,3 +158,66 @@ data class GoalAccountSummary(
     val account: Account,
     val netAmount: Double
 )
+
+// ─── Budget ─────────────────────────────────────────────────────────────────
+
+data class Budget(
+    val id: Long = 0,
+    val categoryId: Long,
+    val limitAmount: Double,
+    val periodDays: Int = 30,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+/** Budget + actual spend for display. */
+data class BudgetProgress(
+    val budget: Budget,
+    val category: Category,
+    val spent: Double
+) {
+    val ratio: Float
+        get() = if (budget.limitAmount > 0) (spent / budget.limitAmount).toFloat().coerceIn(0f, 2f) else 0f
+    val overBudget: Boolean get() = spent > budget.limitAmount
+}
+
+// ─── Template ───────────────────────────────────────────────────────────────
+
+data class Template(
+    val id: Long = 0,
+    val name: String,
+    val amount: Double,
+    val type: TransactionType,
+    val categoryId: Long? = null,
+    val accountId: Long? = null,
+    val note: String = "",
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+// ─── Tag ────────────────────────────────────────────────────────────────────
+
+data class Tag(
+    val id: Long = 0,
+    val name: String,
+    val color: Long = 0xFF6C5CE7
+)
+
+// ─── Challenge ──────────────────────────────────────────────────────────────
+
+data class Challenge(
+    val id: Long = 0,
+    val title: String,
+    val description: String,
+    val emoji: String = "🎯",
+    val targetDays: Int,
+    val targetAmount: Double? = null,
+    val categoryId: Long? = null,
+    val startDate: Long,
+    val endDate: Long,
+    val completed: Boolean = false,
+    val createdAt: Long = System.currentTimeMillis()
+) {
+    val isActive: Boolean get() = !completed && endDate >= System.currentTimeMillis()
+    val daysTotal: Int get() = ((endDate - startDate) / 86_400_000).toInt().coerceAtLeast(1)
+    val daysPassed: Int get() = ((System.currentTimeMillis() - startDate) / 86_400_000).toInt().coerceIn(0, daysTotal)
+    val progress: Float get() = daysPassed.toFloat() / daysTotal.toFloat()
+}

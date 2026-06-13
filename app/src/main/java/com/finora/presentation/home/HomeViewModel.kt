@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.finora.data.repository.FinanceRepository
 import com.finora.domain.model.AccountBalance
+import com.finora.domain.model.BudgetProgress
 import com.finora.domain.model.Goal
 import com.finora.domain.model.TransactionDetails
 import com.finora.presentation.util.startOfMonth
@@ -22,6 +23,8 @@ data class HomeUiState(
     val accounts: List<AccountBalance> = emptyList(),
     val recentTransactions: List<TransactionDetails> = emptyList(),
     val goals: List<Goal> = emptyList(),
+    /** Budgets at ≥ 80% usage — shown as warnings on the home screen. */
+    val budgetAlerts: List<BudgetProgress> = emptyList(),
     val loading: Boolean = true
 ) {
     val freeBalance: Double get() = (totalBalance - inGoals).coerceAtLeast(0.0)
@@ -29,17 +32,15 @@ data class HomeUiState(
 
 class HomeViewModel(repository: FinanceRepository) : ViewModel() {
 
-    // Start of the current month (used for income/expense aggregates).
     private val monthStart = startOfMonth(System.currentTimeMillis())
 
     val uiState: StateFlow<HomeUiState> = combine(
         repository.observeAccountBalances(),
-        // Only the 5 most recent transactions are loaded — not the whole table.
         repository.observeRecentTransactionDetails(5),
-        // Income/expense totals are aggregated in SQL, not summed in memory.
         repository.observeMonthTotals(monthStart),
-        repository.observeGoals()
-    ) { accounts, recent, totals, goals ->
+        repository.observeGoals(),
+        repository.observeBudgetProgress()
+    ) { accounts, recent, totals, goals, budgetProgress ->
         HomeUiState(
             totalBalance = accounts.sumOf { it.balance },
             inGoals = goals.sumOf { it.savedAmount },
@@ -48,10 +49,10 @@ class HomeViewModel(repository: FinanceRepository) : ViewModel() {
             accounts = accounts,
             recentTransactions = recent,
             goals = goals.take(3),
+            budgetAlerts = budgetProgress.filter { it.ratio >= 0.8f },
             loading = false
         )
     }
-        // Run all merging/aggregation off the main thread to keep the UI smooth.
         .flowOn(Dispatchers.Default)
         .stateIn(
             scope = viewModelScope,

@@ -4,14 +4,20 @@ import com.finora.data.local.AppDatabase
 import com.finora.data.local.DefaultData
 import com.finora.data.local.toDomain
 import com.finora.data.local.toEntity
+import com.finora.data.local.entity.TransactionTagEntity
 import com.finora.data.remote.AuthRepository
 import com.finora.data.remote.SyncManager
 import com.finora.domain.model.Account
 import com.finora.domain.model.AccountBalance
+import com.finora.domain.model.Budget
+import com.finora.domain.model.BudgetProgress
 import com.finora.domain.model.Category
+import com.finora.domain.model.Challenge
 import com.finora.domain.model.Goal
 import com.finora.domain.model.GoalContribution
 import com.finora.domain.model.InterestPeriod
+import com.finora.domain.model.Tag
+import com.finora.domain.model.Template
 import com.finora.domain.model.Transaction
 import com.finora.domain.model.TransactionDetails
 import com.finora.domain.model.TransactionType
@@ -40,6 +46,11 @@ class FinanceRepository(
     private val goalDao = db.goalDao()
     private val goalContributionDao = db.goalContributionDao()
     private val transferDao = db.transferDao()
+    private val budgetDao = db.budgetDao()
+    private val templateDao = db.templateDao()
+    private val tagDao = db.tagDao()
+    private val transactionTagDao = db.transactionTagDao()
+    private val challengeDao = db.challengeDao()
 
     private companion object {
         const val DAY_MS = 86_400_000L
@@ -113,15 +124,20 @@ class FinanceRepository(
         combine(
             transactionDao.observeAll(),
             categoryDao.observeAll(),
-            accountDao.observeAll()
-        ) { txs, cats, accs ->
+            accountDao.observeAll(),
+            tagDao.observeAll(),
+            transactionTagDao.observeAll()
+        ) { txs, cats, accs, tags, txTags ->
             val catMap = cats.associateBy { it.id }
             val accMap = accs.associateBy { it.id }
+            val tagMap = tags.associateBy { it.id }
+            val tagsByTx = txTags.groupBy({ it.transactionId }, { it.tagId })
             txs.map { tx ->
                 TransactionDetails(
                     transaction = tx.toDomain(),
                     category = tx.categoryId?.let { catMap[it]?.toDomain() },
-                    account = accMap[tx.accountId]?.toDomain()
+                    account = accMap[tx.accountId]?.toDomain(),
+                    tags = tagsByTx[tx.id]?.mapNotNull { tagMap[it]?.toDomain() } ?: emptyList()
                 )
             }
         }
@@ -374,6 +390,110 @@ class FinanceRepository(
     }
 
     private fun round2(value: Double): Double = kotlin.math.round(value * 100.0) / 100.0
+
+    // ─── Budgets ──────────────────────────────────────────────────────────────
+
+    fun observeBudgets(): Flow<List<Budget>> =
+        budgetDao.observeAll().map { list -> list.map { it.toDomain() } }
+
+    /**
+     * Returns budget progress by combining budget limits with actual expenses
+     * in the current period window (last [budget.periodDays] days).
+     */
+    fun observeBudgetProgress(): Flow<List<BudgetProgress>> =
+        combine(
+            budgetDao.observeAll(),
+            categoryDao.observeAll(),
+            transactionDao.observeAll()
+        ) { budgets, cats, txs ->
+            val catMap = cats.associateBy { it.id }
+            val now = System.currentTimeMillis()
+            budgets.mapNotNull { be ->
+                val cat = catMap[be.categoryId]?.toDomain() ?: return@mapNotNull null
+                val windowStart = now - be.periodDays.toLong() * DAY_MS
+                val spent = txs
+                    .filter { it.type == TransactionType.EXPENSE.name && it.categoryId == be.categoryId && it.date >= windowStart }
+                    .sumOf { it.amount }
+                BudgetProgress(be.toDomain(), cat, spent)
+            }
+        }
+
+    suspend fun addBudget(budget: Budget): Long =
+        budgetDao.upsert(budget.toEntity())
+
+    suspend fun deleteBudget(budget: Budget) =
+        budgetDao.delete(budget.toEntity())
+
+    // ─── Templates ──────────────────────────────────────────────────────────
+
+    fun observeTemplates(): Flow<List<Template>> =
+        templateDao.observeAll().map { list -> list.map { it.toDomain() } }
+
+    suspend fun addTemplate(template: Template): Long =
+        templateDao.upsert(template.toEntity())
+
+    suspend fun deleteTemplate(template: Template) =
+        templateDao.delete(template.toEntity())
+
+    // ─── Tags ───────────────────────────────────────────────────────────────
+
+    fun observeTags(): Flow<List<Tag>> =
+        tagDao.observeAll().map { list -> list.map { it.toDomain() } }
+
+    suspend fun addTag(tag: Tag): Long =
+        tagDao.upsert(tag.toEntity())
+
+    suspend fun deleteTag(tag: Tag) {
+        transactionTagDao.deleteByTag(tag.id)
+        tagDao.delete(tag.toEntity())
+    }
+
+    /** Replace all tag links for a transaction with the given set. */
+    suspend fun setTransactionTags(transactionId: Long, tagIds: Set<Long>) {
+        transactionTagDao.deleteByTransaction(transactionId)
+        tagIds.forEach { tagId ->
+            transactionTagDao.insert(TransactionTagEntity(transactionId, tagId))
+        }
+    }
+
+    fun observeTransactionTagIds(transactionId: Long): Flow<List<Long>> =
+        transactionTagDao.observeTagIds(transactionId)
+
+    suspend fun getTransactionTagIds(transactionId: Long): List<Long> =
+        transactionTagDao.getTagIds(transactionId)
+
+    // ─── Challenges ─────────────────────────────────────────────────────────
+
+    fun observeChallenges(): Flow<List<Challenge>> =
+        challengeDao.observeAll().map { list -> list.map { it.toDomain() } }
+
+    fun observeActiveChallenges(): Flow<List<Challenge>> =
+        challengeDao.observeActive(System.currentTimeMillis())
+            .map { list -> list.map { it.toDomain() } }
+
+    suspend fun addChallenge(challenge: Challenge): Long =
+        challengeDao.upsert(challenge.toEntity())
+
+    suspend fun deleteChallenge(challenge: Challenge) =
+        challengeDao.delete(challenge.toEntity())
+
+    suspend fun completeChallenge(id: Long) =
+        challengeDao.markCompleted(id)
+
+    /**
+     * Total spending in a category between two timestamps.
+     * Used by the challenges system to check spending caps.
+     */
+    suspend fun expenseInCategoryBetween(categoryId: Long?, from: Long, to: Long): Double {
+        // Fetch all transactions, filter in-memory (small dataset)
+        return transactionDao.getAll()
+            .filter {
+                it.type == TransactionType.EXPENSE.name &&
+                    it.date in from..to &&
+                    (categoryId == null || it.categoryId == categoryId)
+            }
+            .sumOf { it.amount }
+    }
 
     // ─── Seeding ─────────────────────────────────────────────────────────────
 

@@ -102,12 +102,6 @@ data class TransferEntity(
 
 /**
  * A rule describing a recurring (automatic) transaction.
- *
- * When [enabled] is true, the app checks on startup (and periodically) whether
- * enough time has elapsed since [lastExecutedAt] to create the next occurrence.
- *
- * [periodDays] is how often the transaction should recur (e.g. 30 for monthly,
- * 7 for weekly, 1 for daily).
  */
 @Serializable
 @Entity(
@@ -116,19 +110,104 @@ data class TransferEntity(
 )
 data class RecurringRuleEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    /** Display name for the rule, e.g. "Подписка Netflix" */
     val name: String,
     val amount: Double,
     /** "INCOME" or "EXPENSE" */
     val type: String,
     val categoryId: Long,
     val accountId: Long,
-    /** Repeat every N days. 30 ≈ monthly, 7 = weekly, 1 = daily. */
     val periodDays: Int,
-    /** Timestamp of the last time a transaction was auto-created by this rule. */
     val lastExecutedAt: Long? = null,
-    /** When the rule was first created. */
     val createdAt: Long,
-    /** Whether the rule is active. */
     val enabled: Boolean = true
+)
+
+// ─── Budgets ─────────────────────────────────────────────────────────────────
+
+/**
+ * Monthly (or custom-period) spending limit for a category.
+ * Progress is computed dynamically from actual transactions.
+ */
+@Serializable
+@Entity(
+    tableName = "budgets",
+    indices = [Index("categoryId")]
+)
+data class BudgetEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val categoryId: Long,
+    /** Spending limit in rubles. */
+    val limitAmount: Double,
+    /** Period length in days (30 = monthly, 7 = weekly). */
+    val periodDays: Int = 30,
+    val createdAt: Long
+)
+
+// ─── Transaction templates ──────────────────────────────────────────────────
+
+/**
+ * Quick-fill template — user taps to pre-populate the add-transaction form.
+ */
+@Serializable
+@Entity(tableName = "templates")
+data class TemplateEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val amount: Double,
+    /** "INCOME" or "EXPENSE" */
+    val type: String,
+    val categoryId: Long?,
+    val accountId: Long?,
+    val note: String = "",
+    val createdAt: Long
+)
+
+// ─── Tags ───────────────────────────────────────────────────────────────────
+
+@Serializable
+@Entity(tableName = "tags")
+data class TagEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val color: Long
+)
+
+/** Many-to-many junction between transactions and tags. */
+@Serializable
+@Entity(
+    tableName = "transaction_tags",
+    primaryKeys = ["transactionId", "tagId"],
+    indices = [Index("transactionId"), Index("tagId")]
+)
+data class TransactionTagEntity(
+    val transactionId: Long,
+    val tagId: Long
+)
+
+// ─── Challenges & achievements ──────────────────────────────────────────────
+
+/**
+ * A time-bound personal finance challenge.
+ * [targetDays] — streak or duration required.
+ * [targetAmount] — optional spending cap (for "spend less than X" challenges).
+ * [categoryId] — optional: constraint to a specific category.
+ */
+@Serializable
+@Entity(tableName = "challenges")
+data class ChallengeEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val title: String,
+    val description: String,
+    val emoji: String = "🎯",
+    /** Number of days the challenge runs. */
+    val targetDays: Int,
+    /** Optional max spend for the period (null = not a spending challenge). */
+    val targetAmount: Double? = null,
+    /** Optional category constraint. */
+    val categoryId: Long? = null,
+    val startDate: Long,
+    val endDate: Long,
+    /** Whether the user completed it. */
+    val completed: Boolean = false,
+    val createdAt: Long
 )

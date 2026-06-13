@@ -1,17 +1,25 @@
 package com.finora.data.local
 
 import com.finora.data.local.entity.AccountEntity
+import com.finora.data.local.entity.BudgetEntity
 import com.finora.data.local.entity.CategoryEntity
+import com.finora.data.local.entity.ChallengeEntity
 import com.finora.data.local.entity.GoalContributionEntity
 import com.finora.data.local.entity.GoalEntity
+import com.finora.data.local.entity.TagEntity
+import com.finora.data.local.entity.TemplateEntity
 import com.finora.data.local.entity.TransactionEntity
 import com.finora.data.local.entity.TransferEntity
 import com.finora.domain.model.Account
 import com.finora.domain.model.AccountType
+import com.finora.domain.model.Budget
 import com.finora.domain.model.Category
+import com.finora.domain.model.Challenge
 import com.finora.domain.model.Goal
 import com.finora.domain.model.GoalContribution
 import com.finora.domain.model.InterestPeriod
+import com.finora.domain.model.Tag
+import com.finora.domain.model.Template
 import com.finora.domain.model.Transaction
 import com.finora.domain.model.TransactionType
 import com.finora.domain.model.Transfer
@@ -164,5 +172,82 @@ fun Transfer.toEntity() = TransferEntity(
     amount = amount,
     note = note,
     date = date,
+    createdAt = createdAt
+)
+
+// ─── Budget ─────────────────────────────────────────────────────────────────
+
+fun BudgetEntity.toDomain() = Budget(
+    id = id,
+    categoryId = categoryId,
+    limitAmount = limitAmount,
+    periodDays = periodDays,
+    createdAt = createdAt
+)
+
+fun Budget.toEntity() = BudgetEntity(
+    id = id,
+    categoryId = categoryId,
+    limitAmount = limitAmount,
+    periodDays = periodDays,
+    createdAt = createdAt
+)
+
+// ─── Template ───────────────────────────────────────────────────────────────
+
+fun TemplateEntity.toDomain() = Template(
+    id = id,
+    name = name,
+    amount = amount,
+    type = parseTransactionType(type),
+    categoryId = categoryId,
+    accountId = accountId,
+    note = note,
+    createdAt = createdAt
+)
+
+fun Template.toEntity() = TemplateEntity(
+    id = id,
+    name = name,
+    amount = amount,
+    type = type.name,
+    categoryId = categoryId,
+    accountId = accountId,
+    note = note,
+    createdAt = createdAt
+)
+
+// ─── Tag ────────────────────────────────────────────────────────────────────
+
+fun TagEntity.toDomain() = Tag(id = id, name = name, color = color)
+fun Tag.toEntity() = TagEntity(id = id, name = name, color = color)
+
+// ─── Challenge ──────────────────────────────────────────────────────────────
+
+fun ChallengeEntity.toDomain() = Challenge(
+    id = id,
+    title = title,
+    description = description,
+    emoji = emoji,
+    targetDays = targetDays,
+    targetAmount = targetAmount,
+    categoryId = categoryId,
+    startDate = startDate,
+    endDate = endDate,
+    completed = completed,
+    createdAt = createdAt
+)
+
+fun Challenge.toEntity() = ChallengeEntity(
+    id = id,
+    title = title,
+    description = description,
+    emoji = emoji,
+    targetDays = targetDays,
+    targetAmount = targetAmount,
+    categoryId = categoryId,
+    startDate = startDate,
+    endDate = endDate,
+    completed = completed,
     createdAt = createdAt
 )

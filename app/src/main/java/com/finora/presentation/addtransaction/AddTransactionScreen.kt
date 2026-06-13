@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -74,6 +76,8 @@ fun AddTransactionScreen(
 ) {
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
+    val templates by viewModel.templates.collectAsStateWithLifecycle()
+    val allTags by viewModel.allTags.collectAsStateWithLifecycle()
 
     LaunchedEffect(transactionId) { viewModel.load(transactionId) }
     LaunchedEffect(accounts) { viewModel.ensureDefaultAccount() }
@@ -134,6 +138,44 @@ fun AddTransactionScreen(
                 mode = viewModel.mode,
                 onChange = viewModel::updateMode
             )
+
+            // ─── Template quick-fill row ──────────────────────────────
+            if (templates.isNotEmpty() && !isEditing) {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "Шаблоны",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(6.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(templates, key = { it.id }) { tpl ->
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.surface)
+                                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
+                                .clickable { viewModel.applyTemplate(tpl) }
+                                .padding(horizontal = 14.dp, vertical = 10.dp)
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    tpl.name,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onBackground,
+                                    maxLines = 1
+                                )
+                                Text(
+                                    "${tpl.amount.toLong()} ₽",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
             Spacer(Modifier.height(20.dp))
 
             // Amount
@@ -297,6 +339,70 @@ fun AddTransactionScreen(
                 )
             }
             Spacer(Modifier.height(12.dp))
+
+            // ─── Tags ─────────────────────────────────────────────────
+            if (!isTransfer) {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "Теги",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(8.dp))
+                var newTagName by remember { mutableStateOf("") }
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    allTags.forEach { tag ->
+                        val sel = tag.id in viewModel.selectedTagIds
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(
+                                    if (sel) Color(tag.color).copy(alpha = 0.18f)
+                                    else MaterialTheme.colorScheme.surfaceVariant
+                                )
+                                .border(
+                                    width = if (sel) 1.5.dp else 0.dp,
+                                    color = if (sel) Color(tag.color) else Color.Transparent,
+                                    shape = RoundedCornerShape(20.dp)
+                                )
+                                .clickable { viewModel.toggleTag(tag.id) }
+                                .padding(horizontal = 14.dp, vertical = 7.dp)
+                        ) {
+                            Text(
+                                "#${tag.name}",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (sel) Color(tag.color) else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                // Quick-add new tag
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = newTagName,
+                        onValueChange = { newTagName = it },
+                        placeholder = { Text("Новый тег") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                        shape = MaterialTheme.shapes.medium
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(
+                        onClick = {
+                            if (newTagName.isNotBlank()) {
+                                viewModel.createTag(newTagName, 0xFF6C5CE7)
+                                newTagName = ""
+                            }
+                        },
+                        enabled = newTagName.isNotBlank()
+                    ) { Text("Добавить") }
+                }
+                Spacer(Modifier.height(12.dp))
+            }
 
             // Note
             OutlinedTextField(

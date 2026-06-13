@@ -58,8 +58,11 @@ import com.finora.presentation.guide.LocalGuideController
 import com.finora.presentation.guide.guideTarget
 import com.finora.presentation.home.HomeScreen
 import com.finora.presentation.onboarding.OnboardingScreen
+import com.finora.presentation.budget.BudgetScreen
+import com.finora.presentation.challenges.ChallengesScreen
 import com.finora.presentation.recurring.RecurringRulesScreen
 import com.finora.presentation.settings.SettingsScreen
+import com.finora.presentation.templates.TemplatesScreen
 import com.finora.presentation.tips.TaxScreen
 import com.finora.presentation.transactions.TransactionsScreen
 import io.github.jan.supabase.auth.auth
@@ -269,7 +272,9 @@ fun FinoraNavHost(
                             onSeeGoals = { navController.navigate(Destination.Goals.route) },
                             onOpenAi = { navController.navigate(Destination.AiChat.route) },
                             onOpenTransaction = { id -> navController.navigate(Destination.AddTransaction.create(id)) },
-                            onOpenTax = { navController.navigate(Destination.TaxDeduction.route) }
+                            onOpenTax = { navController.navigate(Destination.TaxDeduction.route) },
+                            onOpenBudgets = { navController.navigate(Destination.Budgets.route) },
+                            onOpenChallenges = { navController.navigate(Destination.Challenges.route) }
                         )
                     }
                     composable(Destination.TaxDeduction.route) {
@@ -289,11 +294,22 @@ fun FinoraNavHost(
                     composable(Destination.Settings.route) {
                         SettingsScreen(
                             onOpenAccounts = { navController.navigate(Destination.Accounts.route) },
-                            onOpenRecurring = { navController.navigate(Destination.RecurringRules.route) }
+                            onOpenRecurring = { navController.navigate(Destination.RecurringRules.route) },
+                            onOpenBudgets = { navController.navigate(Destination.Budgets.route) },
+                            onOpenTemplates = { navController.navigate(Destination.Templates.route) }
                         )
                     }
                     composable(Destination.RecurringRules.route) {
                         RecurringRulesScreen(onBack = { navController.popBackStack() })
+                    }
+                    composable(Destination.Budgets.route) {
+                        BudgetScreen(onBack = { navController.popBackStack() })
+                    }
+                    composable(Destination.Templates.route) {
+                        TemplatesScreen(onBack = { navController.popBackStack() })
+                    }
+                    composable(Destination.Challenges.route) {
+                        ChallengesScreen(onBack = { navController.popBackStack() })
                     }
                     composable(Destination.Accounts.route) {
                         AccountsScreen(onBack = { navController.popBackStack() })

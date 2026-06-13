@@ -9,6 +9,8 @@ import androidx.lifecycle.viewModelScope
 import com.finora.data.repository.FinanceRepository
 import com.finora.domain.model.Account
 import com.finora.domain.model.Category
+import com.finora.domain.model.Tag
+import com.finora.domain.model.Template
 import com.finora.domain.model.Transaction
 import com.finora.domain.model.TransactionType
 import com.finora.domain.model.Transfer
@@ -29,22 +31,26 @@ class AddTransactionViewModel(private val repository: FinanceRepository) : ViewM
     val categories: StateFlow<List<Category>> = repository.observeCategories()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    val templates: StateFlow<List<Template>> = repository.observeTemplates()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val allTags: StateFlow<List<Tag>> = repository.observeTags()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     var mode by mutableStateOf(EntryMode.EXPENSE)
         private set
 
-    /** Convenience accessor: EXPENSE/INCOME → corresponding TransactionType. */
     val type: TransactionType
         get() = when (mode) {
             EntryMode.EXPENSE -> TransactionType.EXPENSE
             EntryMode.INCOME -> TransactionType.INCOME
-            EntryMode.TRANSFER -> TransactionType.EXPENSE // unused for transfers
+            EntryMode.TRANSFER -> TransactionType.EXPENSE
         }
 
     var amountText by mutableStateOf("")
         private set
     var accountId by mutableStateOf<Long?>(null)
         private set
-    /** Destination account for transfers. */
     var toAccountId by mutableStateOf<Long?>(null)
         private set
     var categoryId by mutableStateOf<Long?>(null)
@@ -57,6 +63,10 @@ class AddTransactionViewModel(private val repository: FinanceRepository) : ViewM
     var editingId by mutableStateOf<Long?>(null)
         private set
     private var loaded = false
+
+    /** Selected tag IDs for this transaction. */
+    var selectedTagIds by mutableStateOf<Set<Long>>(emptySet())
+        private set
 
     val amount: Double
         get() = amountText.replace(',', '.').replace("\u00A0", "").replace(" ", "").toDoubleOrNull() ?: 0.0
@@ -71,12 +81,10 @@ class AddTransactionViewModel(private val repository: FinanceRepository) : ViewM
         if (mode != value) {
             mode = value
             categoryId = null
-            // Reset toAccountId when leaving transfer mode
             if (value != EntryMode.TRANSFER) toAccountId = null
         }
     }
 
-    /** Legacy compat — called from TypeToggle when only INCOME/EXPENSE */
     fun updateType(value: TransactionType) {
         updateMode(if (value == TransactionType.INCOME) EntryMode.INCOME else EntryMode.EXPENSE)
     }
@@ -89,7 +97,6 @@ class AddTransactionViewModel(private val repository: FinanceRepository) : ViewM
     fun setToAccount(id: Long) { toAccountId = id }
     fun setCategory(id: Long?) { categoryId = id }
 
-    /** Creates a custom category of the current [type] and selects it. */
     fun createCategory(name: String, iconKey: String, color: Long) {
         if (name.isBlank()) return
         viewModelScope.launch {
@@ -109,6 +116,27 @@ class AddTransactionViewModel(private val repository: FinanceRepository) : ViewM
     fun updateNote(value: String) { note = value }
     fun setDate(millis: Long) { dateMillis = millis }
 
+    fun toggleTag(tagId: Long) {
+        selectedTagIds = if (tagId in selectedTagIds) selectedTagIds - tagId else selectedTagIds + tagId
+    }
+
+    fun createTag(name: String, color: Long) {
+        if (name.isBlank()) return
+        viewModelScope.launch {
+            val id = repository.addTag(Tag(name = name.trim(), color = color))
+            selectedTagIds = selectedTagIds + id
+        }
+    }
+
+    /** Apply a template: pre-fill amount, type, category, account, note. */
+    fun applyTemplate(template: Template) {
+        mode = if (template.type == TransactionType.INCOME) EntryMode.INCOME else EntryMode.EXPENSE
+        amountText = if (template.amount % 1.0 == 0.0) template.amount.toLong().toString() else template.amount.toString()
+        categoryId = template.categoryId
+        template.accountId?.let { accountId = it }
+        note = template.note
+    }
+
     fun load(id: Long) {
         if (loaded || id <= 0L) {
             loaded = true
@@ -124,6 +152,8 @@ class AddTransactionViewModel(private val repository: FinanceRepository) : ViewM
                 categoryId = tx.categoryId
                 note = tx.note
                 dateMillis = tx.date
+                // Load tags
+                selectedTagIds = repository.getTransactionTagIds(tx.id).toSet()
             }
         }
     }
@@ -145,7 +175,7 @@ class AddTransactionViewModel(private val repository: FinanceRepository) : ViewM
         val accId = accountId ?: return
         if (amount <= 0.0) return
         viewModelScope.launch {
-            repository.addTransaction(
+            val txId = repository.addTransaction(
                 Transaction(
                     id = editingId ?: 0L,
                     amount = amount,
@@ -157,6 +187,10 @@ class AddTransactionViewModel(private val repository: FinanceRepository) : ViewM
                     createdAt = System.currentTimeMillis()
                 )
             )
+            // Save tags
+            if (selectedTagIds.isNotEmpty() || editingId != null) {
+                repository.setTransactionTags(txId, selectedTagIds)
+            }
             onDone()
         }
     }

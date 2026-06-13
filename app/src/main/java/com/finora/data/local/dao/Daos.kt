@@ -7,11 +7,16 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import com.finora.data.local.entity.AccountEntity
+import com.finora.data.local.entity.BudgetEntity
 import com.finora.data.local.entity.CategoryEntity
+import com.finora.data.local.entity.ChallengeEntity
 import com.finora.data.local.entity.GoalContributionEntity
 import com.finora.data.local.entity.GoalEntity
 import com.finora.data.local.entity.RecurringRuleEntity
+import com.finora.data.local.entity.TagEntity
+import com.finora.data.local.entity.TemplateEntity
 import com.finora.data.local.entity.TransactionEntity
+import com.finora.data.local.entity.TransactionTagEntity
 import com.finora.data.local.entity.TransferEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -232,4 +237,108 @@ interface RecurringRuleDao {
 
     @Query("UPDATE recurring_rules SET lastExecutedAt = :ts WHERE id = :id")
     suspend fun updateLastExecuted(id: Long, ts: Long)
+}
+
+// ─── Budgets ─────────────────────────────────────────────────────────────────
+
+@Dao
+interface BudgetDao {
+    @Query("SELECT * FROM budgets ORDER BY createdAt DESC")
+    fun observeAll(): Flow<List<BudgetEntity>>
+
+    @Query("SELECT * FROM budgets")
+    suspend fun getAll(): List<BudgetEntity>
+
+    @Query("SELECT * FROM budgets WHERE categoryId = :categoryId LIMIT 1")
+    suspend fun getByCategoryId(categoryId: Long): BudgetEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(budget: BudgetEntity): Long
+
+    @Delete
+    suspend fun delete(budget: BudgetEntity)
+}
+
+// ─── Templates ──────────────────────────────────────────────────────────────
+
+@Dao
+interface TemplateDao {
+    @Query("SELECT * FROM templates ORDER BY createdAt DESC")
+    fun observeAll(): Flow<List<TemplateEntity>>
+
+    @Query("SELECT * FROM templates")
+    suspend fun getAll(): List<TemplateEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(template: TemplateEntity): Long
+
+    @Delete
+    suspend fun delete(template: TemplateEntity)
+}
+
+// ─── Tags ───────────────────────────────────────────────────────────────────
+
+@Dao
+interface TagDao {
+    @Query("SELECT * FROM tags ORDER BY name ASC")
+    fun observeAll(): Flow<List<TagEntity>>
+
+    @Query("SELECT * FROM tags")
+    suspend fun getAll(): List<TagEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(tag: TagEntity): Long
+
+    @Delete
+    suspend fun delete(tag: TagEntity)
+
+    @Query("SELECT * FROM tags WHERE name = :name LIMIT 1")
+    suspend fun findByName(name: String): TagEntity?
+}
+
+@Dao
+interface TransactionTagDao {
+    @Query("SELECT * FROM transaction_tags")
+    suspend fun getAll(): List<TransactionTagEntity>
+
+    @Query("SELECT * FROM transaction_tags")
+    fun observeAll(): Flow<List<TransactionTagEntity>>
+
+    @Query("SELECT tagId FROM transaction_tags WHERE transactionId = :transactionId")
+    fun observeTagIds(transactionId: Long): Flow<List<Long>>
+
+    @Query("SELECT tagId FROM transaction_tags WHERE transactionId = :transactionId")
+    suspend fun getTagIds(transactionId: Long): List<Long>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(link: TransactionTagEntity)
+
+    @Query("DELETE FROM transaction_tags WHERE transactionId = :transactionId")
+    suspend fun deleteByTransaction(transactionId: Long)
+
+    @Query("DELETE FROM transaction_tags WHERE tagId = :tagId")
+    suspend fun deleteByTag(tagId: Long)
+}
+
+// ─── Challenges ─────────────────────────────────────────────────────────────
+
+@Dao
+interface ChallengeDao {
+    @Query("SELECT * FROM challenges ORDER BY createdAt DESC")
+    fun observeAll(): Flow<List<ChallengeEntity>>
+
+    @Query("SELECT * FROM challenges")
+    suspend fun getAll(): List<ChallengeEntity>
+
+    @Query("SELECT * FROM challenges WHERE completed = 0 AND endDate >= :now")
+    fun observeActive(now: Long): Flow<List<ChallengeEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(challenge: ChallengeEntity): Long
+
+    @Delete
+    suspend fun delete(challenge: ChallengeEntity)
+
+    @Query("UPDATE challenges SET completed = 1 WHERE id = :id")
+    suspend fun markCompleted(id: Long)
 }

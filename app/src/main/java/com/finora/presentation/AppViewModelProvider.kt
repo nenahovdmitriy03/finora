@@ -8,12 +8,14 @@ import com.finora.presentation.accounts.AccountsViewModel
 import com.finora.presentation.addtransaction.AddTransactionViewModel
 import com.finora.presentation.ai.AiChatViewModel
 import com.finora.presentation.auth.AuthViewModel
+import com.finora.presentation.budget.BudgetViewModel
+import com.finora.presentation.challenges.ChallengesViewModel
 import com.finora.presentation.goals.GoalsViewModel
 import com.finora.presentation.home.AiInsightViewModel
 import com.finora.presentation.home.HomeViewModel
 import com.finora.presentation.recurring.RecurringRulesViewModel
-
 import com.finora.presentation.settings.SettingsViewModel
+import com.finora.presentation.templates.TemplatesViewModel
 import com.finora.presentation.tips.TaxViewModel
 import com.finora.presentation.transactions.TransactionsViewModel
 
@@ -52,5 +54,8 @@ object AppViewModelProvider {
         }
         initializer { RecurringRulesViewModel(creationApp(this).container.db, creationApp(this).container.repository) }
         initializer { TaxViewModel(creationApp(this).container.repository) }
+        initializer { BudgetViewModel(creationApp(this).container.repository) }
+        initializer { TemplatesViewModel(creationApp(this).container.repository) }
+        initializer { ChallengesViewModel(creationApp(this).container.repository) }
     }
 }

@@ -2,37 +2,37 @@ package com.finora.presentation.util
 
 /** Curated color palette (ARGB longs) for categories, accounts and goals. */
 val finoraPalette: List<Long> = listOf(
-    0xFF6C5CE7, // violet
-    0xFF3FB18C, // green
-    0xFF0984E3, // blue
-    0xFFE17055, // coral
-    0xFFE84393, // pink
-    0xFFFDCB6E, // amber
-    0xFF00CEC9, // teal
-    0xFFA29BFE, // lavender
-    0xFFE07685, // red
-    0xFF74B9FF, // sky
-    0xFF55EFC4, // mint
-    0xFFFAB1A0  // peach
+    0xFF6366F1, // indigo
+    0xFF10B981, // emerald
+    0xFF3B82F6, // blue
+    0xFFF59E0B, // amber
+    0xFFEC4899, // pink
+    0xFF14B8A6, // teal
+    0xFF8B5CF6, // violet
+    0xFFF97316, // orange
+    0xFFEF4444, // red
+    0xFF06B6D4, // cyan
+    0xFF84CC16, // lime
+    0xFFD946EF  // fuchsia
 )
 
 /**
  * Hue-spaced palette for charts/legends so neighbouring slices never blend.
- * Assign by index (chartColorAt) instead of the raw category color.
+ * Maximise perceptual distance between adjacent entries.
  */
 val chartPalette: List<Long> = listOf(
-    0xFF6C5CE7, // violet
-    0xFFFDCB6E, // amber
-    0xFF00CEC9, // teal
-    0xFFE84393, // pink
-    0xFF0984E3, // blue
-    0xFFE17055, // coral
-    0xFF55EFC4, // mint
-    0xFFA29BFE, // lavender
-    0xFFE07685, // red
-    0xFF74B9FF, // sky
-    0xFF3FB18C, // green
-    0xFFFAB1A0  // peach
+    0xFF6366F1, // indigo
+    0xFF10B981, // emerald
+    0xFFF59E0B, // amber
+    0xFFEC4899, // pink
+    0xFF3B82F6, // blue
+    0xFFF97316, // orange
+    0xFF8B5CF6, // violet
+    0xFF14B8A6, // teal
+    0xFFEF4444, // red
+    0xFF06B6D4, // cyan
+    0xFF84CC16, // lime
+    0xFFD946EF  // fuchsia
 )
 
 fun chartColorAt(index: Int): Long = chartPalette[index % chartPalette.size]

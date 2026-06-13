@@ -110,7 +110,7 @@ class TransactionsViewModel(private val repository: FinanceRepository) : ViewMod
             .groupBy { it.category!! }
             .map { (category, items) ->
                 val sum = items.sumOf { it.transaction.amount }
-                CategoryStat(category, sum, (sum / total).toFloat())
+                CategoryStat(category, sum, (sum / total).toFloat(), items.size)
             }
             .sortedByDescending { it.total }
     }

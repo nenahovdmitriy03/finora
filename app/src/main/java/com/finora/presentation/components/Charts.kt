@@ -2,6 +2,9 @@ package com.finora.presentation.components
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -18,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -32,38 +36,35 @@ import kotlin.math.sqrt
 data class DonutSlice(val value: Float, val color: Color)
 
 /**
- * An animated donut chart with tap-to-select interaction.
- *
- * Improvements over the previous minimal version:
- * - Smooth arc-sweep animation on first draw / data change
- * - Tap a slice to select it (pops outward slightly)
- * - The [onSliceSelected] callback reports which slice was tapped (-1 = deselected)
- * - Customisable gap, stroke width, and selection offset
+ * A modern animated donut chart with tap-to-select, gradient arcs and smooth spring animation.
  */
 @Composable
 fun DonutChart(
     slices: List<DonutSlice>,
     modifier: Modifier = Modifier,
-    size: Dp = 180.dp,
-    strokeWidth: Dp = 26.dp,
-    trackColor: Color = Color(0x14000000),
+    size: Dp = 200.dp,
+    strokeWidth: Dp = 28.dp,
+    trackColor: Color = Color(0x0A000000),
     onSliceSelected: (Int) -> Unit = {},
     center: @Composable () -> Unit = {}
 ) {
     val total = slices.sumOf { it.value.toDouble() }.toFloat()
     var selectedIndex by remember { mutableIntStateOf(-1) }
 
-    // Animate the sweep multiplier from 0 → 1
+    // Animate sweep from 0→1
     val sweepAnim = remember { Animatable(0f) }
     LaunchedEffect(slices) {
         sweepAnim.snapTo(0f)
-        sweepAnim.animateTo(
-            1f,
-            animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing)
-        )
+        sweepAnim.animateTo(1f, tween(900, easing = FastOutSlowInEasing))
     }
 
-    // Precompute slice angles for hit testing
+    // Animate selection pop
+    val selectionScale by animateFloatAsState(
+        targetValue = if (selectedIndex >= 0) 1f else 0f,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "selectionScale"
+    )
+
     val sliceAngles = remember(slices, total) {
         if (total <= 0f) emptyList()
         else {
@@ -92,80 +93,82 @@ fun DonutChart(
                         val sw = strokeWidth.toPx()
                         val radius = (this.size.width - sw) / 2f
 
-                        // Check if tap is on the donut ring
-                        if (dist < radius - sw / 2f || dist > radius + sw / 2f) {
-                            selectedIndex = -1
-                            onSliceSelected(-1)
-                            return@detectTapGestures
+                        if (dist < radius - sw * 0.8f || dist > radius + sw * 0.8f) {
+                            selectedIndex = -1; onSliceSelected(-1); return@detectTapGestures
                         }
 
-                        // Compute angle in degrees from 12 o'clock (top)
-                        var angle = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat()
-                        // Canvas starts at 3 o'clock; our arcs start at -90° (12 o'clock)
-                        // So adjust: angle from canvas 0°, then compare to startAngle
-                        val gap = if (sliceAngles.size > 1) 4f else 0f
-
+                        val angle = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat()
+                        val gap = if (sliceAngles.size > 1) 3f else 0f
                         for ((i, pair) in sliceAngles.withIndex()) {
                             val (start, sweep) = pair
                             val s = start + gap / 2f
                             val e = s + (sweep - gap).coerceAtLeast(0.5f)
                             if (angleInRange(angle, s, e)) {
                                 selectedIndex = if (selectedIndex == i) -1 else i
-                                onSliceSelected(selectedIndex)
-                                return@detectTapGestures
+                                onSliceSelected(selectedIndex); return@detectTapGestures
                             }
                         }
-                        selectedIndex = -1
-                        onSliceSelected(-1)
+                        selectedIndex = -1; onSliceSelected(-1)
                     }
                 }
         ) {
             val sw = strokeWidth.toPx()
-            val selectionOffset = sw * 0.25f
+            val selectionOffset = sw * 0.3f
             val inset = sw / 2f + selectionOffset
             val arcSize = Size(this.size.width - inset * 2, this.size.height - inset * 2)
             val topLeft = Offset(inset, inset)
-            val cx = this.size.width / 2f
-            val cy = this.size.height / 2f
 
             // Background track
             drawArc(
                 color = trackColor,
-                startAngle = 0f,
-                sweepAngle = 360f,
-                useCenter = false,
-                topLeft = topLeft,
-                size = arcSize,
+                startAngle = 0f, sweepAngle = 360f,
+                useCenter = false, topLeft = topLeft, size = arcSize,
                 style = Stroke(width = sw, cap = StrokeCap.Round)
             )
 
             if (total <= 0f || sliceAngles.isEmpty()) return@Canvas
 
-            val gap = if (sliceAngles.size > 1) 4f else 0f
+            val gap = if (sliceAngles.size > 1) 3f else 0f
             val animProgress = sweepAnim.value
 
             sliceAngles.forEachIndexed { i, (startAngle, sweep) ->
-                val animatedSweep = (sweep * animProgress)
+                val animatedSweep = sweep * animProgress
                 if (animatedSweep <= 0f) return@forEachIndexed
 
                 val isSelected = (i == selectedIndex)
-                val currentSw = if (isSelected) sw * 1.15f else sw
+                val currentSw = if (isSelected) sw * 1.2f else sw
 
-                // Pop selected slice outward
+                // Pop outward on selection
                 val offset = if (isSelected) {
                     val midAngle = Math.toRadians((startAngle + sweep / 2f).toDouble())
                     Offset(
-                        (cos(midAngle) * selectionOffset).toFloat(),
-                        (sin(midAngle) * selectionOffset).toFloat()
+                        (cos(midAngle) * selectionOffset * selectionScale).toFloat(),
+                        (sin(midAngle) * selectionOffset * selectionScale).toFloat()
                     )
                 } else Offset.Zero
 
+                val sliceColor = slices[i].color
+                val alpha = when {
+                    isSelected -> 1f
+                    selectedIndex >= 0 -> 0.35f
+                    else -> 1f
+                }
+
+                // Gradient arc: slightly lighter at start → full color at end
+                val arcStart = startAngle + gap / 2f
+                val arcSweep = (animatedSweep - gap).coerceAtLeast(0.5f)
+
                 val sliceTopLeft = topLeft + offset
                 drawArc(
-                    color = if (isSelected) slices[i].color
-                            else slices[i].color.copy(alpha = if (selectedIndex >= 0) 0.5f else 1f),
-                    startAngle = startAngle + gap / 2f,
-                    sweepAngle = (animatedSweep - gap).coerceAtLeast(0.5f),
+                    brush = Brush.sweepGradient(
+                        colors = listOf(
+                            sliceColor.copy(alpha = alpha * 0.7f),
+                            sliceColor.copy(alpha = alpha),
+                            sliceColor.copy(alpha = alpha)
+                        )
+                    ),
+                    startAngle = arcStart,
+                    sweepAngle = arcSweep,
                     useCenter = false,
                     topLeft = sliceTopLeft,
                     size = arcSize,
@@ -177,22 +180,16 @@ fun DonutChart(
     }
 }
 
-/** Check if [angle] falls within the arc from [start] to [start + sweep] (in degrees). */
 private fun angleInRange(angle: Float, start: Float, end: Float): Boolean {
-    // Normalize all angles to 0..360
     fun norm(a: Float): Float { var r = a % 360f; if (r < 0) r += 360f; return r }
-    val a = norm(angle)
-    val s = norm(start)
-    val e = norm(end)
+    val a = norm(angle); val s = norm(start); val e = norm(end)
     return if (s <= e) a in s..e else (a >= s || a <= e)
 }
 
 data class NetBar(val label: String, val net: Float)
 
 /**
- * Net cash-flow per period (income − expense) drawn as bars around a zero baseline.
- * Up bars (surplus) use [positiveColor], down bars (deficit) use [negativeColor] —
- * dynamics are shown by direction, not by red/green.
+ * Net cash-flow per period drawn as rounded bars around a zero baseline.
  */
 @Composable
 fun NetTrendChart(
@@ -211,12 +208,11 @@ fun NetTrendChart(
         val zeroY = this.size.height / 2f
         val halfSpan = this.size.height / 2f - 8f
 
-        // zero baseline
         drawRoundRect(
             color = baselineColor,
-            topLeft = Offset(0f, zeroY - 1.dp.toPx()),
-            size = Size(this.size.width, 2.dp.toPx()),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(1.dp.toPx(), 1.dp.toPx())
+            topLeft = Offset(0f, zeroY - 0.5.dp.toPx()),
+            size = Size(this.size.width, 1.dp.toPx()),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(0.5.dp.toPx(), 0.5.dp.toPx())
         )
 
         bars.forEachIndexed { index, bar ->

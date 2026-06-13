@@ -135,7 +135,8 @@ data class TransactionDetails(
 data class CategoryStat(
     val category: Category,
     val total: Double,
-    val share: Float
+    val share: Float,
+    val count: Int = 0
 )
 
 /** One bucket on the time axis of the trend chart. */

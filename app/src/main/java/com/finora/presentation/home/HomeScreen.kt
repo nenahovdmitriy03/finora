@@ -333,29 +333,16 @@ private fun AiInsightCard(
                         color = MaterialTheme.colorScheme.onBackground
                     )
                 }
-                ai.dailyInsightDate?.let { date ->
-                    Text(
-                        text = "обновлено $date",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
                 Spacer(Modifier.height(6.dp))
                 if (ai.configured) {
-                    val previewText = ai.dailyInsight
-                        ?.lines()
-                        ?.filter { it.isNotBlank() }
-                        ?.take(3)
-                        ?.joinToString("\n")
-                        ?: "Разберу доходы, расходы и цели — спроси что угодно о финансах!"
                     Text(
-                        text = previewText,
+                        text = "Разберу доходы, расходы и цели — спроси что угодно о финансах!",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 3
                     )
                     Spacer(Modifier.height(8.dp))
-                    TextButton(onClick = onOpenAi) { Text("Подробнее") }
+                    TextButton(onClick = onOpenAi) { Text("Спросить Алию") }
                 } else {
                     Text(
                         text = "Добавь API-ключ в local.properties:\n" +

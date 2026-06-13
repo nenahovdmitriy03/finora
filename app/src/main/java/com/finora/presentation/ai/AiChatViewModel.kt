@@ -198,6 +198,30 @@ class AiChatViewModel(
 6. 🏦 Счета — баланс по каждому
 7. 💡 Советы — 2–3 конкретных совета
 8. ⚠️ Предупреждения — если есть проблемы
+9. 🧾 Налоговый вычет — если есть подходящие расходы
+
+## Налоговый вычет (ст. 219 НК РФ)
+Если в данных пользователя есть расходы в категориях, подходящих для социального вычета — ОБЯЗАТЕЛЬНО упоминай это.
+Подходящие категории расходов → тип вычета:
+- Здоровье, лечение, стоматология, аптека, клиника → медицинский вычет
+- Образование, обучение, курсы, школа, университет → образовательный вычет
+- Спорт, фитнес, бассейн, секции → физкультурный вычет
+- Страхование жизни (от 5 лет) → страховой вычет
+- Благотворительность → благотворительный вычет
+
+Правила расчёта:
+- Ставка возврата: 13% от суммы расходов
+- Лимит социальных вычетов: 150 000 ₽/год (максимум возврат 19 500 ₽)
+- Дорогостоящее лечение (код 2) — без лимита
+- Обучение детей — отдельный лимит 110 000 ₽/год на ребёнка
+- Вычет доступен только плательщикам НДФЛ 13%
+
+Формат упоминания:
+🧾 **Налоговый вычет**
+Расходы на «Здоровье» (**12 000 ₽**) подходят для медицинского вычета → возврат ~**1 560 ₽**
+Подробнее — в разделе «Налоговый вычет» на главном экране.
+
+Если подходящих расходов нет — НЕ упоминай вычет.
 
 === Финансовые данные пользователя (валюта — рубли ₽) ===
 $dataContext"""
@@ -318,6 +342,48 @@ $dataContext"""
         sb.appendLine("--- Источники доходов ---")
         if (topIncomeCats.isEmpty()) sb.appendLine("- нет доходов")
         else topIncomeCats.forEach { (name, total) -> sb.appendLine("- $name: ${formatMoney(total)}") }
+        sb.appendLine()
+        // Tax deduction eligible expenses (full year)
+        val yearStart = java.util.Calendar.getInstance().apply {
+            timeInMillis = now; set(java.util.Calendar.DAY_OF_YEAR, 1)
+            set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val taxKeywords = mapOf(
+            "здоров" to "медицинский", "медиц" to "медицинский",
+            "лечен" to "медицинский", "аптек" to "медицинский",
+            "стомат" to "медицинский", "клиник" to "медицинский",
+            "образов" to "образовательный", "обучен" to "образовательный",
+            "курс" to "образовательный", "школ" to "образовательный",
+            "универс" to "образовательный", "спорт" to "физкультурный",
+            "фитнес" to "физкультурный", "бассейн" to "физкультурный",
+            "благотвор" to "благотворительный", "страхов" to "страховой"
+        )
+        val yearExpenses = transactions.filter {
+            it.transaction.type == TransactionType.EXPENSE && it.transaction.date >= yearStart
+        }
+        val taxEligible = yearExpenses
+            .filter { td ->
+                val catLower = (td.category?.name ?: "").lowercase()
+                taxKeywords.keys.any { catLower.contains(it) }
+            }
+            .groupBy { td ->
+                val catLower = (td.category?.name ?: "").lowercase()
+                val type = taxKeywords.entries.firstOrNull { catLower.contains(it.key) }?.value ?: "прочий"
+                "${td.category?.name ?: "?"} → $type вычет"
+            }
+            .mapValues { (_, list) -> list.sumOf { it.transaction.amount } }
+        sb.appendLine("--- Расходы, подходящие для налогового вычета (за год) ---")
+        if (taxEligible.isEmpty()) sb.appendLine("- нет подходящих расходов")
+        else {
+            var totalDeductible = 0.0
+            taxEligible.forEach { (label, total) ->
+                sb.appendLine("- $label: ${formatMoney(total)} → возврат ~${formatMoney(total * 0.13)}")
+                totalDeductible += total
+            }
+            val capped = minOf(totalDeductible, 150_000.0)
+            sb.appendLine("Итого: ${formatMoney(totalDeductible)} (лимит 150 000 ₽) → возврат ~${formatMoney(capped * 0.13)}")
+        }
         sb.appendLine()
         sb.appendLine("--- Цели накоплений ---")
         if (goals.isEmpty()) sb.appendLine("- нет целей")

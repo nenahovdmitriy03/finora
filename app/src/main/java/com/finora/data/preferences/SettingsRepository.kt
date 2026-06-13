@@ -22,8 +22,6 @@ class SettingsRepository(context: Context) {
     private val themeKey = stringPreferencesKey("theme_mode")
     private val accentKey = stringPreferencesKey("accent_color")
     private val aiSessionKey = stringPreferencesKey("ai_chat_session")
-    private val dailyInsightKey = stringPreferencesKey("daily_insight")
-    private val dailyInsightDateKey = stringPreferencesKey("daily_insight_date")
     /** The user id whose data currently lives in the local Room DB. */
     private val dataOwnerKey = stringPreferencesKey("data_owner_id")
 
@@ -61,23 +59,6 @@ class SettingsRepository(context: Context) {
 
     suspend fun clearAiChatSession() {
         appContext.dataStore.edit { prefs -> prefs.remove(aiSessionKey) }
-    }
-
-    // ─── Daily AI insight (background worker) ───────────────────────────
-
-    val dailyInsight: Flow<String> = appContext.dataStore.data.map { prefs ->
-        prefs[dailyInsightKey].orEmpty()
-    }
-
-    val dailyInsightDate: Flow<String> = appContext.dataStore.data.map { prefs ->
-        prefs[dailyInsightDateKey].orEmpty()
-    }
-
-    suspend fun setDailyInsight(text: String, date: String) {
-        appContext.dataStore.edit { prefs ->
-            prefs[dailyInsightKey] = text
-            prefs[dailyInsightDateKey] = date
-        }
     }
 
     // ─── Local data owner (multi-account isolation) ──────────────────────

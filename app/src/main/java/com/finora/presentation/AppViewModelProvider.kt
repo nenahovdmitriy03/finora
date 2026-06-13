@@ -24,7 +24,7 @@ private fun creationApp(extras: androidx.lifecycle.viewmodel.CreationExtras): Fi
 object AppViewModelProvider {
     val Factory = viewModelFactory {
         initializer { HomeViewModel(creationApp(this).container.repository) }
-        initializer { AiInsightViewModel(creationApp(this).container.settings) }
+        initializer { AiInsightViewModel() }
         initializer {
             AiChatViewModel(
                 creationApp(this).container.repository,

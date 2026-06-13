@@ -134,34 +134,72 @@ class AiChatViewModel(
 
     private fun systemTurn() = ChatTurn(
         "system",
-        """Ты — Алия, дружелюбный AI-ассистент приложения личных финансов Finora.
+        """Ты — Алия, персональный AI-финансовый аналитик приложения Finora.
 
-## Правила ответа
-- Язык: русский
-- Опирайся ТОЛЬКО на реальные данные пользователя ниже; никогда не выдумывай цифры
-- Будь конкретной: называй суммы, проценты, категории
-- Тон: дружелюбный, ободряющий, но честный
+## Твоя личность
+- Имя: Алия
+- Характер: профессиональный, но дружелюбный; как подруга-финансист
+- Говоришь: уверенно, конкретно, с заботой о пользователе
+- Если данных мало — честно скажи, но предложи что отслеживать
 
-## Формат вывода (Markdown)
-Каждый ответ оформляй красиво и структурированно:
+## Строгие правила
+1. Язык: ТОЛЬКО русский
+2. Данные: опирайся ИСКЛЮЧИТЕЛЬНО на реальные данные пользователя ниже
+3. НИКОГДА не выдумывай цифры, категории, счета или операции, которых нет
+4. Всегда называй конкретные суммы, проценты, названия категорий
+5. Если расходы > доходов — это КРАСНЫЙ ФЛАГ, обязательно упомяни
+6. Сравнивай с прошлым месяцем когда есть данные
 
-1. **Заголовок секции** — используй строку с эмодзи-иконкой:
-   📊 **Обзор за месяц**
-2. **Ключевые метрики** — выделяй числа жирным:
-   Доход: **45 000 ₽** | Расход: **32 000 ₽** | Баланс: **+13 000 ₽**
-3. **Списки** — используй маркированные списки с эмодзи-маркерами:
-   - 🍔 Еда — **12 400 ₽** (38%)
-   - 🏠 Жильё — **8 000 ₽** (25%)
-4. **Прогресс целей** — показывай визуально:
-   🎯 Отпуск: ████████░░ **80%** (40 000 / 50 000 ₽)
-5. **Советы/выводы** — отдельной секцией с 💡:
-   💡 **Совет:** Расходы на кафе выросли на 20% — попробуй установить лимит 5 000 ₽/мес
-6. **Разделители** — между секциями ставь пустую строку
+## Формат вывода
 
-Не используй заголовки Markdown (#). Используй **жирный** для акцентов.
-Эмодзи используй как иконки-маркеры секций (📊 💰 📈 🎯 💡 ⚠️ ✅ 🔥), не переусердствуй.
+Оформляй каждый ответ КРАСИВО и СТРУКТУРИРОВАННО:
 
-=== Данные пользователя (валюта — рубли) ===
+📊 **Заголовок секции**
+
+Каждую секцию начинай с эмодзи + жирный заголовок. Между секциями — пустая строка.
+
+**Ключевые метрики** — в строку через разделитель:
+💰 Доход: **45 000 ₽** | 💸 Расход: **32 000 ₽** | 📈 Сальдо: **+13 000 ₽**
+
+**Списки расходов/доходов** — с эмодзи-иконками категорий и процентами:
+- 🍔 Еда — **12 400 ₽** (38%)
+- 🏠 Жильё — **8 000 ₽** (25%)
+- 🚗 Транспорт — **3 200 ₽** (10%)
+
+**Прогресс целей** — визуальные прогресс-бары:
+🎯 Отпуск: ████████░░ **80%** (40 000 / 50 000 ₽)
+🎓 Курс: ███░░░░░░░ **30%** (6 000 / 20 000 ₽)
+
+**Динамика** — сравнение с прошлым месяцем:
+📈 Расходы на еду: **↑ 15%** по сравнению с прошлым месяцем
+📉 Транспорт: **↓ 8%** — отлично!
+
+**Советы** — конкретные, действенные:
+💡 **Совет:** Расходы на кафе выросли — установи лимит **5 000 ₽/мес** и готовь дома 2 раза в неделю
+
+**Предупреждения** — если есть проблемы:
+⚠️ Расходы превышают доходы на **5 000 ₽** — к концу месяца баланс уйдёт в минус
+
+## Правила форматирования
+- НЕ используй заголовки Markdown (#, ##)
+- Используй **жирный** для всех чисел и акцентов
+- Эмодзи-иконки для секций: 📊 💰 💸 📈 📉 🎯 💡 ⚠️ ✅ 🔥 💎 🏦
+- Подбирай эмодзи к категориям: 🍔🛒🏠🚗💊🎮👗📱✈️🎓💇📺
+- Прогресс-бары из символов: █ (заполнено) и ░ (пусто), всего 10 блоков
+- Между секциями — пустая строка
+- Разделители (---) между крупными блоками
+
+## Что включать в полный анализ
+1. 📊 Обзор — ключевые метрики месяца одной строкой
+2. 💸 Топ расходов — с процентами и эмодзи
+3. 💰 Доходы — источники и суммы
+4. 📈 Динамика — сравнение с прошлым месяцем (↑↓)
+5. 🎯 Цели — прогресс-бары и до дедлайна
+6. 🏦 Счета — баланс по каждому
+7. 💡 Советы — 2–3 конкретных совета
+8. ⚠️ Предупреждения — если есть проблемы
+
+=== Финансовые данные пользователя (валюта — рубли ₽) ===
 $dataContext"""
     )
 
@@ -197,11 +235,25 @@ $dataContext"""
         val transactions = repository.observeTransactionDetails().first()
         val goals = repository.observeGoals().first()
 
-        val monthStart = startOfMonth(System.currentTimeMillis())
+        val now = System.currentTimeMillis()
+        val monthStart = startOfMonth(now)
+
+        // Current month
         val monthTx = transactions.filter { it.transaction.date >= monthStart }
         val income = monthTx.filter { it.transaction.type == TransactionType.INCOME }
             .sumOf { it.transaction.amount }
         val expense = monthTx.filter { it.transaction.type == TransactionType.EXPENSE }
+            .sumOf { it.transaction.amount }
+
+        // Previous month for comparison
+        val prevMonthEnd = monthStart - 1
+        val prevMonthStart = startOfMonth(prevMonthEnd)
+        val prevTx = transactions.filter {
+            it.transaction.date in prevMonthStart until monthStart
+        }
+        val prevIncome = prevTx.filter { it.transaction.type == TransactionType.INCOME }
+            .sumOf { it.transaction.amount }
+        val prevExpense = prevTx.filter { it.transaction.type == TransactionType.EXPENSE }
             .sumOf { it.transaction.amount }
 
         val topExpenseCats = monthTx
@@ -209,31 +261,74 @@ $dataContext"""
             .groupBy { it.category?.name ?: "Без категории" }
             .mapValues { (_, list) -> list.sumOf { it.transaction.amount } }
             .entries.sortedByDescending { it.value }
-            .take(8)
+            .take(10)
+
+        val topIncomeCats = monthTx
+            .filter { it.transaction.type == TransactionType.INCOME }
+            .groupBy { it.category?.name ?: "Без категории" }
+            .mapValues { (_, list) -> list.sumOf { it.transaction.amount } }
+            .entries.sortedByDescending { it.value }
+            .take(5)
+
+        // Previous month expense by category for comparison
+        val prevExpenseCats = prevTx
+            .filter { it.transaction.type == TransactionType.EXPENSE }
+            .groupBy { it.category?.name ?: "Без категории" }
+            .mapValues { (_, list) -> list.sumOf { it.transaction.amount } }
 
         val sb = StringBuilder()
-        sb.appendLine("Общий баланс: ${formatMoney(accounts.sumOf { it.balance })}")
-        sb.appendLine("Доходы за текущий месяц: ${formatMoney(income)}")
-        sb.appendLine("Расходы за текущий месяц: ${formatMoney(expense)}")
-        sb.appendLine("Сальдо за месяц: ${formatMoney(income - expense)}")
+        sb.appendLine("Общий баланс всех счетов: ${formatMoney(accounts.sumOf { it.balance })}")
         sb.appendLine()
-        sb.appendLine("Счета:")
+        sb.appendLine("--- Текущий месяц ---")
+        sb.appendLine("Доходы: ${formatMoney(income)}")
+        sb.appendLine("Расходы: ${formatMoney(expense)}")
+        sb.appendLine("Сальдо: ${formatMoney(income - expense)}")
+        sb.appendLine("Количество операций: ${monthTx.size}")
+        sb.appendLine()
+        sb.appendLine("--- Прошлый месяц (для сравнения) ---")
+        sb.appendLine("Доходы: ${formatMoney(prevIncome)}")
+        sb.appendLine("Расходы: ${formatMoney(prevExpense)}")
+        sb.appendLine("Сальдо: ${formatMoney(prevIncome - prevExpense)}")
+        sb.appendLine()
+        sb.appendLine("--- Счета ---")
         if (accounts.isEmpty()) sb.appendLine("- нет")
         else accounts.forEach { ab ->
             val acc = ab.account
-            val savings = if (acc.hasInterest) " (накопительный, ${acc.interestRate}% годовых)" else ""
-            sb.appendLine("- ${acc.name}: ${formatMoney(ab.balance)}$savings")
+            val extras = buildList {
+                if (acc.hasInterest) add("накопительный, ${acc.interestRate}% годовых")
+            }.joinToString(", ")
+            val suffix = if (extras.isNotEmpty()) " ($extras)" else ""
+            sb.appendLine("- ${acc.name}: ${formatMoney(ab.balance)}$suffix")
         }
         sb.appendLine()
-        sb.appendLine("Топ категорий расходов за месяц:")
-        if (topExpenseCats.isEmpty()) sb.appendLine("- нет расходов в этом месяце")
-        else topExpenseCats.forEach { (name, total) -> sb.appendLine("- $name: ${formatMoney(total)}") }
+        sb.appendLine("--- Топ расходов за текущий месяц ---")
+        if (topExpenseCats.isEmpty()) sb.appendLine("- нет расходов")
+        else topExpenseCats.forEach { (name, total) ->
+            val pct = if (expense > 0) ((total / expense) * 100).toInt() else 0
+            val prev = prevExpenseCats[name]
+            val delta = if (prev != null && prev > 0) {
+                val change = ((total - prev) / prev * 100).toInt()
+                if (change > 0) " (↑${change}% vs прошлый мес.)"
+                else if (change < 0) " (↓${-change}% vs прошлый мес.)"
+                else " (без изменений)"
+            } else ""
+            sb.appendLine("- $name: ${formatMoney(total)} ($pct%)$delta")
+        }
         sb.appendLine()
-        sb.appendLine("Цели накоплений:")
-        if (goals.isEmpty()) sb.appendLine("- нет")
+        sb.appendLine("--- Источники доходов ---")
+        if (topIncomeCats.isEmpty()) sb.appendLine("- нет доходов")
+        else topIncomeCats.forEach { (name, total) -> sb.appendLine("- $name: ${formatMoney(total)}") }
+        sb.appendLine()
+        sb.appendLine("--- Цели накоплений ---")
+        if (goals.isEmpty()) sb.appendLine("- нет целей")
         else goals.forEach { g ->
             val pct = (g.progress * 100).toInt()
-            sb.appendLine("- ${g.name}: ${formatMoney(g.savedAmount)} из ${formatMoney(g.targetAmount)} ($pct%)")
+            val deadlineStr = g.deadline?.let { dl ->
+                val daysLeft = ((dl - now) / 86_400_000).toInt()
+                if (daysLeft > 0) ", осталось $daysLeft дней" else ", дедлайн прошёл"
+            } ?: ""
+            val remaining = g.targetAmount - g.savedAmount
+            sb.appendLine("- ${g.name}: ${formatMoney(g.savedAmount)} / ${formatMoney(g.targetAmount)} ($pct%, осталось ${formatMoney(remaining)})$deadlineStr")
         }
         return sb.toString()
     }

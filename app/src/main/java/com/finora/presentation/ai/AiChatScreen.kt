@@ -8,10 +8,9 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
-import androidx.compose.foundation.background
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,20 +18,24 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -40,12 +43,10 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.PhotoCamera
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -59,24 +60,25 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.finora.R
 import com.finora.presentation.AppViewModelProvider
-import com.finora.presentation.theme.LocalFinoraColors
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,9 +90,8 @@ fun AiChatScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     var input by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
-    val finora = LocalFinoraColors.current
 
-    // Scroll to the *bottom* of the last item so long bubbles aren't cut off
+    // Scroll to the bottom of the last item so long bubbles aren't cut off
     LaunchedEffect(state.messages.size, state.loading) {
         val count = state.messages.size + if (state.loading) 1 else 0
         if (count > 0) listState.animateScrollToItem(count - 1, scrollOffset = Int.MAX_VALUE / 2)
@@ -98,31 +99,23 @@ fun AiChatScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
+                        Image(
+                            painter = painterResource(id = R.drawable.mascot_half_ai),
+                            contentDescription = null,
                             modifier = Modifier
-                                .size(32.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    Brush.linearGradient(
-                                        listOf(finora.brandStart, finora.brandEnd)
-                                    )
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Rounded.AutoAwesome,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
+                                .size(36.dp)
+                                .clip(CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
                         Spacer(Modifier.width(10.dp))
                         Column {
-                            Text("AI-аналитика", style = MaterialTheme.typography.titleMedium)
+                            Text("Алия", style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold)
                             state.provider?.let {
                                 Text(
                                     "через $it",
@@ -156,7 +149,6 @@ fun AiChatScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .imePadding()
         ) {
             if (!state.configured) {
                 NotConfigured()
@@ -165,7 +157,9 @@ fun AiChatScreen(
 
             if (state.messages.isEmpty() && !state.loading && state.error == null) {
                 AiEmptyState(
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
                     onSuggestion = { suggestion ->
                         viewModel.send(suggestion)
                     }
@@ -236,6 +230,8 @@ fun AiChatScreen(
     }
 }
 
+// ─── Empty state ────────────────────────────────────────────────────────────
+
 @Composable
 private fun AiEmptyState(
     modifier: Modifier = Modifier,
@@ -253,7 +249,7 @@ private fun AiEmptyState(
         verticalArrangement = Arrangement.Center
     ) {
         Image(
-            painter = painterResource(id = com.finora.R.drawable.mascot_ai),
+            painter = painterResource(id = R.drawable.mascot_ai),
             contentDescription = "Алия — AI-ассистент",
             modifier = Modifier.height(200.dp),
             contentScale = ContentScale.Fit
@@ -274,7 +270,6 @@ private fun AiEmptyState(
         )
         Spacer(Modifier.height(24.dp))
 
-        // Quick suggestion chips
         Column(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -299,26 +294,25 @@ private fun AiEmptyState(
     }
 }
 
+// ─── Chat bubbles ───────────────────────────────────────────────────────────
+
+/** Aliya mascot avatar used in assistant bubbles. */
+@Composable
+private fun AliyaAvatar(modifier: Modifier = Modifier) {
+    Image(
+        painter = painterResource(id = R.drawable.mascot_half_ai),
+        contentDescription = "Алия",
+        modifier = modifier
+            .size(34.dp)
+            .clip(CircleShape),
+        contentScale = ContentScale.Crop
+    )
+}
+
 @Composable
 private fun AssistantBubble(text: String) {
-    val finora = LocalFinoraColors.current
     Row(verticalAlignment = Alignment.Top) {
-        Box(
-            modifier = Modifier
-                .size(34.dp)
-                .clip(CircleShape)
-                .background(
-                    Brush.linearGradient(listOf(finora.brandStart, finora.brandEnd))
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                Icons.Rounded.AutoAwesome,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(18.dp)
-            )
-        }
+        AliyaAvatar()
         Spacer(Modifier.width(10.dp))
         Surface(
             color = MaterialTheme.colorScheme.surface,
@@ -335,7 +329,6 @@ private fun AssistantBubble(text: String) {
 
 @Composable
 private fun UserBubble(text: String) {
-    val finora = LocalFinoraColors.current
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
         Surface(
             color = MaterialTheme.colorScheme.primary,
@@ -353,31 +346,14 @@ private fun UserBubble(text: String) {
     }
 }
 
-/**
- * Animated 3-dot typing indicator with bouncing dots.
- */
+// ─── Typing indicator ───────────────────────────────────────────────────────
+
 @Composable
 private fun TypingIndicator() {
-    val finora = LocalFinoraColors.current
     val transition = rememberInfiniteTransition(label = "typing")
 
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier
-                .size(34.dp)
-                .clip(CircleShape)
-                .background(
-                    Brush.linearGradient(listOf(finora.brandStart, finora.brandEnd))
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                Icons.Rounded.AutoAwesome,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(18.dp)
-            )
-        }
+        AliyaAvatar()
         Spacer(Modifier.width(10.dp))
         Surface(
             color = MaterialTheme.colorScheme.surface,
@@ -412,15 +388,19 @@ private fun TypingIndicator() {
     }
 }
 
+// ─── Not configured ─────────────────────────────────────────────────────────
+
 @Composable
 private fun NotConfigured() {
     Box(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Image(
-                painter = painterResource(id = com.finora.R.drawable.mascot_think),
+                painter = painterResource(id = R.drawable.mascot_think),
                 contentDescription = null,
                 modifier = Modifier.height(160.dp),
                 contentScale = ContentScale.Fit
@@ -437,6 +417,8 @@ private fun NotConfigured() {
     }
 }
 
+// ─── Input bar — modern, keyboard-safe ──────────────────────────────────────
+
 @Composable
 private fun InputBar(
     value: String,
@@ -444,36 +426,60 @@ private fun InputBar(
     enabled: Boolean,
     onSend: () -> Unit
 ) {
+    val canSend = enabled && value.isNotBlank()
+    val bottomInsets = WindowInsets.ime.union(WindowInsets.navigationBars)
+
     Surface(
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 2.dp,
-        shadowElevation = 4.dp
+        shadowElevation = 6.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .windowInsetsPadding(bottomInsets)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.Bottom
         ) {
-            OutlinedTextField(
-                value = value,
-                onValueChange = onValueChange,
+            // Text field area
+            Surface(
                 modifier = Modifier.weight(1f),
-                placeholder = { Text("Спроси что-нибудь о финансах…") },
-                shape = RoundedCornerShape(24.dp),
-                maxLines = 4,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(onSend = { if (enabled) onSend() })
-            )
-            Spacer(Modifier.width(8.dp))
-            val canSend = enabled && value.isNotBlank()
+                shape = RoundedCornerShape(22.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+            ) {
+                Box(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    if (value.isEmpty()) {
+                        Text(
+                            text = "Спроси что-нибудь о финансах…",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                    }
+                    BasicTextField(
+                        value = value,
+                        onValueChange = onValueChange,
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(
+                            color = MaterialTheme.colorScheme.onBackground
+                        ),
+                        maxLines = 4,
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                        keyboardActions = KeyboardActions(onSend = { if (canSend) onSend() })
+                    )
+                }
+            }
+            Spacer(Modifier.width(10.dp))
+            // Send button
             Surface(
                 onClick = { if (canSend) onSend() },
                 modifier = Modifier.size(44.dp),
                 shape = CircleShape,
                 color = if (canSend) MaterialTheme.colorScheme.primary
-                       else MaterialTheme.colorScheme.surfaceVariant,
+                else MaterialTheme.colorScheme.surfaceVariant,
                 enabled = canSend
             ) {
                 Box(contentAlignment = Alignment.Center) {
@@ -481,7 +487,7 @@ private fun InputBar(
                         Icons.AutoMirrored.Rounded.Send,
                         contentDescription = "Отправить",
                         tint = if (canSend) Color.White
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -489,6 +495,8 @@ private fun InputBar(
         }
     }
 }
+
+// ─── Markdown renderer ──────────────────────────────────────────────────────
 
 /**
  * Enhanced Markdown renderer for AI responses.
@@ -506,10 +514,8 @@ private fun AiMarkdown(text: String, modifier: Modifier = Modifier) {
             val trimmed = raw.trim()
 
             when {
-                // Empty line → small spacer
                 trimmed.isEmpty() -> Spacer(Modifier.height(4.dp))
 
-                // Divider
                 trimmed.matches(Regex("^-{3,}$")) -> {
                     Box(
                         Modifier
@@ -520,7 +526,6 @@ private fun AiMarkdown(text: String, modifier: Modifier = Modifier) {
                     )
                 }
 
-                // Header (# or ##)
                 trimmed.startsWith("#") -> {
                     val content = trimmed.trimStart('#').trim()
                     Text(
@@ -531,7 +536,6 @@ private fun AiMarkdown(text: String, modifier: Modifier = Modifier) {
                     )
                 }
 
-                // Bullet (-, *, •)
                 trimmed.startsWith("- ") || trimmed.startsWith("* ") || trimmed.startsWith("• ") -> {
                     val content = trimmed.removePrefix("- ").removePrefix("* ").removePrefix("• ").trim()
                     val startsWithEmoji = content.isNotEmpty() && !content[0].isLetterOrDigit() && content[0] != '*'
@@ -554,7 +558,6 @@ private fun AiMarkdown(text: String, modifier: Modifier = Modifier) {
                     }
                 }
 
-                // Numbered list (1. 2. etc)
                 trimmed.matches(Regex("^\\d+\\.\\s.*")) -> {
                     val numEnd = trimmed.indexOf('.')
                     val number = trimmed.substring(0, numEnd)
@@ -575,7 +578,6 @@ private fun AiMarkdown(text: String, modifier: Modifier = Modifier) {
                     }
                 }
 
-                // Progress bar line (contains █ or ░)
                 trimmed.contains('█') || trimmed.contains('░') -> {
                     Text(
                         text = parseInline(trimmed),
@@ -585,7 +587,6 @@ private fun AiMarkdown(text: String, modifier: Modifier = Modifier) {
                     )
                 }
 
-                // Regular paragraph
                 else -> {
                     Text(
                         text = parseInline(trimmed),
@@ -598,7 +599,7 @@ private fun AiMarkdown(text: String, modifier: Modifier = Modifier) {
     }
 }
 
-/** Converts **bold** markers into bold spans; leaves everything else as-is. */
+/** Converts **bold** markers into bold spans. */
 private fun parseInline(text: String): AnnotatedString = buildAnnotatedString {
     var i = 0
     while (i < text.length) {

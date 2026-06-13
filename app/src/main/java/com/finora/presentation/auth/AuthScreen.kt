@@ -76,9 +76,9 @@ fun AuthScreen(
                 )
             ) {
                 Image(
-                    painter = painterResource(id = R.drawable.mascot_greet),
+                    painter = painterResource(id = R.drawable.mascot_half_greet),
                     contentDescription = "Алия приветствует",
-                    modifier = Modifier.height(170.dp),
+                    modifier = Modifier.height(200.dp),
                     contentScale = ContentScale.Fit
                 )
             }

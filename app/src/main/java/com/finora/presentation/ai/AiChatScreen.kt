@@ -90,9 +90,10 @@ fun AiChatScreen(
     val listState = rememberLazyListState()
     val finora = LocalFinoraColors.current
 
+    // Scroll to the *bottom* of the last item so long bubbles aren't cut off
     LaunchedEffect(state.messages.size, state.loading) {
         val count = state.messages.size + if (state.loading) 1 else 0
-        if (count > 0) listState.animateScrollToItem(count - 1)
+        if (count > 0) listState.animateScrollToItem(count - 1, scrollOffset = Int.MAX_VALUE / 2)
     }
 
     Scaffold(

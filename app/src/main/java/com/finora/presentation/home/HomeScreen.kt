@@ -1,5 +1,6 @@
 package com.finora.presentation.home
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -34,6 +35,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -293,58 +296,56 @@ private fun AiInsightCard(
 ) {
     val ai by viewModel.state.collectAsStateWithLifecycle()
     FinoraCard(modifier = Modifier.clickable(enabled = ai.configured) { onOpenAi() }) {
-        Column {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)),
-                    contentAlignment = Alignment.Center
-                ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            // Mascot avatar
+            Image(
+                painter = painterResource(id = com.finora.R.drawable.mascot_half_ai),
+                contentDescription = "Алия — AI-ассистент",
+                modifier = Modifier
+                    .height(100.dp)
+                    .padding(end = 12.dp),
+                contentScale = ContentScale.Fit
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Rounded.AutoAwesome,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(18.dp)
                     )
-                }
-                Spacer(Modifier.width(10.dp))
-                Column(modifier = Modifier.weight(1f)) {
+                    Spacer(Modifier.width(6.dp))
                     Text(
-                        text = "AI-аналитика",
+                        text = "Алия — AI-аналитика",
                         style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onBackground
                     )
-                    ai.provider?.let { provider ->
-                        Text(
-                            text = "через $provider",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
                 }
+                ai.provider?.let { provider ->
+                    Text(
+                        text = "через $provider",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
                 if (ai.configured) {
+                    Text(
+                        text = "Разберу доходы, расходы и цели — спроси что угодно о финансах!",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(8.dp))
                     TextButton(onClick = onOpenAi) { Text("Анализировать") }
+                } else {
+                    Text(
+                        text = "Добавь API-ключ в local.properties:\n" +
+                            "• OPENROUTER_API_KEY\n• GROQ_API_KEY\n• GEMINI_API_KEY",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
-            }
-            Spacer(Modifier.height(6.dp))
-            if (ai.configured) {
-                Text(
-                    text = "Открой умного помощника — он разберёт твои доходы, расходы, счета и цели, " +
-                        "подскажет, что улучшить, и ответит на твои вопросы.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
-                Text(
-                    text = "Чтобы включить ИИ, добавь в local.properties ключ одного из провайдеров и пересобери:\n" +
-                        "• OPENROUTER_API_KEY (openrouter.ai — много бесплатных моделей)\n" +
-                        "• GROQ_API_KEY (console.groq.com — быстро и бесплатно)\n" +
-                        "• GEMINI_API_KEY (Google AI Studio)",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
         }
     }

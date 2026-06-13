@@ -73,7 +73,7 @@ private fun darkColors(accent: AccentColor) = darkColorScheme(
 @Composable
 fun FinoraTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    accent: AccentColor = AccentColor.VIOLET,
+    accent: AccentColor = AccentColor.BLUE,
     content: @Composable () -> Unit
 ) {
     val colorScheme = if (darkTheme) darkColors(accent) else lightColors(accent)

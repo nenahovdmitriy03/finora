@@ -50,7 +50,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.finora.domain.model.CategoryStat
@@ -66,10 +65,9 @@ import com.finora.presentation.util.formatMoney
 import com.finora.presentation.util.relativeDayLabel
 import kotlin.math.roundToInt
 
-// ─── Modern accent colours ──────────────────────────────────────────────────
+// Semantic text-only colours — used for labels/numbers, never large backgrounds
 private val IncomeGreen = Color(0xFF10B981)
 private val ExpenseRose = Color(0xFFF43F5E)
-private val NetIndigo = Color(0xFF6366F1)
 
 @Composable
 fun TransactionsScreen(
@@ -115,21 +113,24 @@ fun TransactionsScreen(
                     label = "Доход",
                     value = formatMoney(state.monthIncome),
                     icon = Icons.Rounded.ArrowDownward,
-                    tint = IncomeGreen,
+                    iconTint = IncomeGreen,
+                    valueTint = IncomeGreen,
                     modifier = Modifier.weight(1f)
                 )
                 SummaryChip(
                     label = "Расход",
                     value = formatMoney(state.monthExpense),
                     icon = Icons.Rounded.ArrowUpward,
-                    tint = ExpenseRose,
+                    iconTint = ExpenseRose,
+                    valueTint = ExpenseRose,
                     modifier = Modifier.weight(1f)
                 )
                 SummaryChip(
                     label = "Итого",
                     value = formatMoney(net),
                     icon = Icons.AutoMirrored.Rounded.TrendingUp,
-                    tint = if (net >= 0) IncomeGreen else ExpenseRose,
+                    iconTint = MaterialTheme.colorScheme.primary,
+                    valueTint = if (net >= 0) IncomeGreen else ExpenseRose,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -257,13 +258,14 @@ private fun SummaryChip(
     label: String,
     value: String,
     icon: ImageVector,
-    tint: Color,
+    iconTint: Color,
+    valueTint: Color,
     modifier: Modifier = Modifier
 ) {
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
-        color = tint.copy(alpha = 0.08f),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
         tonalElevation = 0.dp
     ) {
         Column(
@@ -274,13 +276,13 @@ private fun SummaryChip(
                 modifier = Modifier
                     .size(32.dp)
                     .clip(CircleShape)
-                    .background(tint.copy(alpha = 0.15f)),
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     icon,
                     contentDescription = null,
-                    tint = tint,
+                    tint = iconTint,
                     modifier = Modifier.size(16.dp)
                 )
             }
@@ -294,7 +296,7 @@ private fun SummaryChip(
                 value,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground,
+                color = valueTint,
                 maxLines = 1
             )
         }
@@ -310,7 +312,7 @@ private fun CategoryBreakdownCard(state: TransactionsUiState) {
     val total = if (showExpense) state.monthExpense else state.monthIncome
 
     FinoraCard {
-        // Toggle
+        // Toggle — neutral theme-coloured segment
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -319,8 +321,8 @@ private fun CategoryBreakdownCard(state: TransactionsUiState) {
                 .padding(3.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            SegmentButton("Расходы", showExpense, ExpenseRose, Modifier.weight(1f)) { showExpense = true }
-            SegmentButton("Доходы", !showExpense, IncomeGreen, Modifier.weight(1f)) { showExpense = false }
+            SegmentButton("Расходы", showExpense, Modifier.weight(1f)) { showExpense = true }
+            SegmentButton("Доходы", !showExpense, Modifier.weight(1f)) { showExpense = false }
         }
         Spacer(Modifier.height(24.dp))
 
@@ -346,8 +348,7 @@ private fun CategoryBreakdownCard(state: TransactionsUiState) {
                     center = {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
-                                selectedStat?.category?.name
-                                    ?: if (showExpense) "Всего" else "Всего",
+                                selectedStat?.category?.name ?: "Всего",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1
@@ -469,20 +470,22 @@ private fun CategoryStatRow(stat: CategoryStat, color: Color, isSelected: Boolea
     }
 }
 
-// ─── Toggle button ──────────────────────────────────────────────────────────
+// ─── Toggle button — uses theme primary, no red/green ───────────────────────
 
 @Composable
 private fun SegmentButton(
     label: String,
     selected: Boolean,
-    accent: Color,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(10.dp))
-            .background(if (selected) accent else Color.Transparent)
+            .background(
+                if (selected) MaterialTheme.colorScheme.primary
+                else Color.Transparent
+            )
             .clickable { onClick() }
             .padding(vertical = 10.dp),
         contentAlignment = Alignment.Center
@@ -491,7 +494,8 @@ private fun SegmentButton(
             label,
             style = MaterialTheme.typography.labelLarge,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-            color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+            color = if (selected) MaterialTheme.colorScheme.onPrimary
+            else MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }

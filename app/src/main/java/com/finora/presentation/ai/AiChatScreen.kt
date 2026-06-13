@@ -489,41 +489,109 @@ private fun InputBar(
     }
 }
 
-/** Renders a tiny subset of Markdown: bullet lines and **bold** spans. */
+/**
+ * Enhanced Markdown renderer for AI responses.
+ * Supports: **bold**, bullet lists (-, *, •), numbered lists (1.),
+ * headers (#), dividers (---), and progress-bar lines (█░).
+ */
 @Composable
 private fun AiMarkdown(text: String, modifier: Modifier = Modifier) {
-    val lines = text.replace("\r\n", "\n").split("\n").map { it.trim() }.filter { it.isNotEmpty() }
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    val lines = text.replace("\r\n", "\n").split("\n")
+    val primary = MaterialTheme.colorScheme.primary
+    val onBg = MaterialTheme.colorScheme.onBackground
+
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         lines.forEach { raw ->
-            val isBullet = raw.startsWith("* ") || raw.startsWith("- ") || raw.startsWith("•")
-            val isHeader = raw.startsWith("#")
-            val content = raw
-                .removePrefix("* ").removePrefix("- ").removePrefix("•")
-                .trimStart('#').trim()
-            if (isBullet) {
-                Row(verticalAlignment = Alignment.Top) {
+            val trimmed = raw.trim()
+
+            when {
+                // Empty line → small spacer
+                trimmed.isEmpty() -> Spacer(Modifier.height(4.dp))
+
+                // Divider
+                trimmed.matches(Regex("^-{3,}$")) -> {
                     Box(
-                        modifier = Modifier
-                            .padding(top = 7.dp)
-                            .size(6.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary)
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    Text(
-                        text = parseInline(content),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onBackground
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .height(1.dp)
+                            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                     )
                 }
-            } else {
-                Text(
-                    text = parseInline(content),
-                    style = if (isHeader) MaterialTheme.typography.titleSmall
-                    else MaterialTheme.typography.bodyMedium,
-                    fontWeight = if (isHeader) FontWeight.SemiBold else null,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
+
+                // Header (# or ##)
+                trimmed.startsWith("#") -> {
+                    val content = trimmed.trimStart('#').trim()
+                    Text(
+                        text = parseInline(content),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = onBg
+                    )
+                }
+
+                // Bullet (-, *, •)
+                trimmed.startsWith("- ") || trimmed.startsWith("* ") || trimmed.startsWith("• ") -> {
+                    val content = trimmed.removePrefix("- ").removePrefix("* ").removePrefix("• ").trim()
+                    val startsWithEmoji = content.isNotEmpty() && !content[0].isLetterOrDigit() && content[0] != '*'
+                    Row(verticalAlignment = Alignment.Top) {
+                        if (!startsWithEmoji) {
+                            Box(
+                                modifier = Modifier
+                                    .padding(top = 8.dp)
+                                    .size(5.dp)
+                                    .clip(CircleShape)
+                                    .background(primary)
+                            )
+                            Spacer(Modifier.width(10.dp))
+                        }
+                        Text(
+                            text = parseInline(content),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = onBg
+                        )
+                    }
+                }
+
+                // Numbered list (1. 2. etc)
+                trimmed.matches(Regex("^\\d+\\.\\s.*")) -> {
+                    val numEnd = trimmed.indexOf('.')
+                    val number = trimmed.substring(0, numEnd)
+                    val content = trimmed.substring(numEnd + 1).trim()
+                    Row(verticalAlignment = Alignment.Top) {
+                        Text(
+                            text = "$number.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = primary,
+                            modifier = Modifier.width(22.dp)
+                        )
+                        Text(
+                            text = parseInline(content),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = onBg
+                        )
+                    }
+                }
+
+                // Progress bar line (contains █ or ░)
+                trimmed.contains('█') || trimmed.contains('░') -> {
+                    Text(
+                        text = parseInline(trimmed),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = onBg,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                // Regular paragraph
+                else -> {
+                    Text(
+                        text = parseInline(trimmed),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = onBg
+                    )
+                }
             }
         }
     }
@@ -544,7 +612,7 @@ private fun parseInline(text: String): AnnotatedString = buildAnnotatedString {
             append(text.substring(start))
             break
         }
-        withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) {
+        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
             append(text.substring(start + 2, end))
         }
         i = end + 2

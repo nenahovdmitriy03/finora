@@ -99,3 +99,36 @@ data class TransferEntity(
     val date: Long,
     val createdAt: Long
 )
+
+/**
+ * A rule describing a recurring (automatic) transaction.
+ *
+ * When [enabled] is true, the app checks on startup (and periodically) whether
+ * enough time has elapsed since [lastExecutedAt] to create the next occurrence.
+ *
+ * [periodDays] is how often the transaction should recur (e.g. 30 for monthly,
+ * 7 for weekly, 1 for daily).
+ */
+@Serializable
+@Entity(
+    tableName = "recurring_rules",
+    indices = [Index("categoryId"), Index("accountId")]
+)
+data class RecurringRuleEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    /** Display name for the rule, e.g. "Подписка Netflix" */
+    val name: String,
+    val amount: Double,
+    /** "INCOME" or "EXPENSE" */
+    val type: String,
+    val categoryId: Long,
+    val accountId: Long,
+    /** Repeat every N days. 30 ≈ monthly, 7 = weekly, 1 = daily. */
+    val periodDays: Int,
+    /** Timestamp of the last time a transaction was auto-created by this rule. */
+    val lastExecutedAt: Long? = null,
+    /** When the rule was first created. */
+    val createdAt: Long,
+    /** Whether the rule is active. */
+    val enabled: Boolean = true
+)

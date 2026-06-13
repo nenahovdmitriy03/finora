@@ -1,10 +1,16 @@
 package com.finora.presentation.auth
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material.icons.rounded.Lock
@@ -17,7 +23,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -27,6 +35,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.finora.R
 import com.finora.presentation.AppViewModelProvider
 
 @Composable
@@ -55,8 +64,26 @@ fun AuthScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .animateContentSize()
         ) {
+            // ─── Mascot ───────────────────────────────────────
+            androidx.compose.animation.AnimatedVisibility(
+                visible = true,
+                enter = fadeIn(tween(600)) + slideInVertically(
+                    initialOffsetY = { -it / 3 },
+                    animationSpec = tween(600)
+                )
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.mascot_greet),
+                    contentDescription = "Алия приветствует",
+                    modifier = Modifier.height(170.dp),
+                    contentScale = ContentScale.Fit
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+
             // Logo / Title
             Text(
                 "Finora",
@@ -70,7 +97,7 @@ fun AuthScreen(
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onBackground
             )
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(24.dp))
 
             // Email field
             OutlinedTextField(

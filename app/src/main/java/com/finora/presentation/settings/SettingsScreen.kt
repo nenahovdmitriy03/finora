@@ -33,6 +33,7 @@ import androidx.compose.material.icons.rounded.DeleteForever
 import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material.icons.rounded.LightMode
+import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.SettingsBrightness
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.AlertDialog
@@ -78,6 +79,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun SettingsScreen(
     onOpenAccounts: () -> Unit,
+    onOpenRecurring: () -> Unit = {},
     viewModel: SettingsViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
@@ -175,6 +177,13 @@ fun SettingsScreen(
                         title = "Мои счета",
                         subtitle = "Банки, карты и кошельки",
                         onClick = onOpenAccounts
+                    )
+                    RowDivider()
+                    SettingRow(
+                        icon = Icons.Rounded.Repeat,
+                        title = "Автооперации",
+                        subtitle = "Регулярные списания и пополнения",
+                        onClick = onOpenRecurring
                     )
                     RowDivider()
                     SettingRow(

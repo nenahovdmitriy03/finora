@@ -10,6 +10,7 @@ import com.finora.data.local.entity.AccountEntity
 import com.finora.data.local.entity.CategoryEntity
 import com.finora.data.local.entity.GoalContributionEntity
 import com.finora.data.local.entity.GoalEntity
+import com.finora.data.local.entity.RecurringRuleEntity
 import com.finora.data.local.entity.TransactionEntity
 import com.finora.data.local.entity.TransferEntity
 import kotlinx.coroutines.flow.Flow
@@ -208,4 +209,27 @@ interface TransferDao {
             "FROM transfers GROUP BY toAccountId"
     )
     fun observeTransferDeltas(): Flow<List<BalanceDelta>>
+}
+
+// ─── Recurring Rules ────────────────────────────────────────────────────────
+
+@Dao
+interface RecurringRuleDao {
+    @Query("SELECT * FROM recurring_rules ORDER BY createdAt DESC")
+    fun observeAll(): Flow<List<RecurringRuleEntity>>
+
+    @Query("SELECT * FROM recurring_rules")
+    suspend fun getAll(): List<RecurringRuleEntity>
+
+    @Query("SELECT * FROM recurring_rules WHERE enabled = 1")
+    suspend fun getEnabled(): List<RecurringRuleEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(rule: RecurringRuleEntity): Long
+
+    @Delete
+    suspend fun delete(rule: RecurringRuleEntity)
+
+    @Query("UPDATE recurring_rules SET lastExecutedAt = :ts WHERE id = :id")
+    suspend fun updateLastExecuted(id: Long, ts: Long)
 }

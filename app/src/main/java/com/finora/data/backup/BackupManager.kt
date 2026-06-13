@@ -6,6 +6,7 @@ import com.finora.data.local.entity.AccountEntity
 import com.finora.data.local.entity.CategoryEntity
 import com.finora.data.local.entity.GoalContributionEntity
 import com.finora.data.local.entity.GoalEntity
+import com.finora.data.local.entity.RecurringRuleEntity
 import com.finora.data.local.entity.TransactionEntity
 import com.finora.data.local.entity.TransferEntity
 import kotlinx.coroutines.Dispatchers
@@ -29,7 +30,7 @@ data class BackupData(
     /** Backup format version — bump when the schema changes. */
     val version: Int = 1,
     /** App data schema (Room) version this backup was taken at. */
-    val dbVersion: Int = 5,
+    val dbVersion: Int = 6,
     /** When the backup was created (epoch millis). */
     val exportedAt: Long = 0L,
     val accounts: List<AccountEntity> = emptyList(),
@@ -37,11 +38,12 @@ data class BackupData(
     val transactions: List<TransactionEntity> = emptyList(),
     val goals: List<GoalEntity> = emptyList(),
     val goalContributions: List<GoalContributionEntity> = emptyList(),
-    val transfers: List<TransferEntity> = emptyList()
+    val transfers: List<TransferEntity> = emptyList(),
+    val recurringRules: List<RecurringRuleEntity> = emptyList()
 ) {
     val totalRecords: Int
         get() = accounts.size + categories.size + transactions.size +
-            goals.size + goalContributions.size + transfers.size
+            goals.size + goalContributions.size + transfers.size + recurringRules.size
 }
 
 class BackupManager(private val db: AppDatabase) {
@@ -63,7 +65,8 @@ class BackupManager(private val db: AppDatabase) {
             transactions = db.transactionDao().getAll(),
             goals = db.goalDao().getAll(),
             goalContributions = db.goalContributionDao().getAll(),
-            transfers = db.transferDao().getAll()
+            transfers = db.transferDao().getAll(),
+            recurringRules = db.recurringRuleDao().getAll()
         )
         Log.d(TAG, "exportToJson: ${data.totalRecords} records")
         json.encodeToString(BackupData.serializer(), data)
@@ -94,6 +97,7 @@ class BackupManager(private val db: AppDatabase) {
         data.transactions.forEach { db.transactionDao().upsert(it) }
         data.transfers.forEach { db.transferDao().upsert(it) }
         data.goalContributions.forEach { db.goalContributionDao().upsert(it) }
+        data.recurringRules.forEach { db.recurringRuleDao().upsert(it) }
 
         data
     }
@@ -101,7 +105,7 @@ class BackupManager(private val db: AppDatabase) {
     companion object {
         private const val TAG = "BackupManager"
         const val CURRENT_VERSION = 1
-        private const val DB_VERSION = 5
+        private const val DB_VERSION = 6
         /** Suggested file name for exported backups. */
         fun suggestedFileName(): String {
             val ts = java.text.SimpleDateFormat("yyyyMMdd_HHmm", java.util.Locale.US)

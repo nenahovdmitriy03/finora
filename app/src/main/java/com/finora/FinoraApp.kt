@@ -1,6 +1,7 @@
 package com.finora
 
 import android.app.Application
+import com.finora.data.recurring.RecurringRulesManager
 import com.finora.di.AppContainer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,6 +23,8 @@ class FinoraApp : Application() {
             container.repository.ensureSeeded()
             // 2. Accrue interest on savings accounts
             container.repository.applyInterestAccruals()
+            // 3. Execute overdue recurring transaction rules
+            RecurringRulesManager(container.db).executePending()
             // NOTE: no auto-upload here. Cloud sync only happens:
             //   • after data changes (triggerCloudSync → scheduleUpload)
             //   • on login flow (download; if remote empty → upload)

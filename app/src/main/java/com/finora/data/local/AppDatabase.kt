@@ -8,12 +8,14 @@ import com.finora.data.local.dao.AccountDao
 import com.finora.data.local.dao.CategoryDao
 import com.finora.data.local.dao.GoalContributionDao
 import com.finora.data.local.dao.GoalDao
+import com.finora.data.local.dao.RecurringRuleDao
 import com.finora.data.local.dao.TransactionDao
 import com.finora.data.local.dao.TransferDao
 import com.finora.data.local.entity.AccountEntity
 import com.finora.data.local.entity.CategoryEntity
 import com.finora.data.local.entity.GoalContributionEntity
 import com.finora.data.local.entity.GoalEntity
+import com.finora.data.local.entity.RecurringRuleEntity
 import com.finora.data.local.entity.TransactionEntity
 import com.finora.data.local.entity.TransferEntity
 
@@ -24,9 +26,10 @@ import com.finora.data.local.entity.TransferEntity
         TransactionEntity::class,
         GoalEntity::class,
         GoalContributionEntity::class,
-        TransferEntity::class
+        TransferEntity::class,
+        RecurringRuleEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -36,6 +39,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun goalDao(): GoalDao
     abstract fun goalContributionDao(): GoalContributionDao
     abstract fun transferDao(): TransferDao
+    abstract fun recurringRuleDao(): RecurringRuleDao
 
     companion object {
         const val NAME = "finora.db"
@@ -125,6 +129,28 @@ abstract class AppDatabase : RoomDatabase() {
                         (SELECT SUM(g.savedAmount) FROM goals g
                          WHERE g.linkedAccountId = accounts.id AND g.savedAmount > 0), 0)"""
                 )
+            }
+        }
+
+        /** v6: recurring (auto) transaction rules. */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS recurring_rules (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        name TEXT NOT NULL,
+                        amount REAL NOT NULL,
+                        type TEXT NOT NULL,
+                        categoryId INTEGER NOT NULL,
+                        accountId INTEGER NOT NULL,
+                        periodDays INTEGER NOT NULL,
+                        lastExecutedAt INTEGER,
+                        createdAt INTEGER NOT NULL,
+                        enabled INTEGER NOT NULL DEFAULT 1
+                    )"""
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_recurring_rules_categoryId ON recurring_rules(categoryId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_recurring_rules_accountId ON recurring_rules(accountId)")
             }
         }
     }

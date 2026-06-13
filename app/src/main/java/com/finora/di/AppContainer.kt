@@ -8,6 +8,7 @@ import com.finora.data.backup.BackupManager
 import com.finora.data.local.AppDatabase
 import com.finora.data.preferences.SettingsRepository
 import com.finora.data.remote.AuthRepository
+import com.finora.data.remote.NetworkMonitor
 import com.finora.data.remote.SupabaseModule
 import com.finora.data.remote.SyncManager
 import com.finora.data.repository.FinanceRepository
@@ -24,11 +25,16 @@ class AppContainer(context: Context) {
             AppDatabase.MIGRATION_1_2,
             AppDatabase.MIGRATION_2_3,
             AppDatabase.MIGRATION_3_4,
-            AppDatabase.MIGRATION_4_5
+            AppDatabase.MIGRATION_4_5,
+            AppDatabase.MIGRATION_5_6
         )
         .build()
 
     val settings: SettingsRepository = SettingsRepository(context.applicationContext)
+
+    // ─── Network ──────────────────────────────────────────────────────────
+
+    val networkMonitor: NetworkMonitor = NetworkMonitor(context.applicationContext)
 
     // ─── Supabase ────────────────────────────────────────────────────────
 

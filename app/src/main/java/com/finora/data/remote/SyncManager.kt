@@ -39,8 +39,26 @@ class SyncManager(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var pendingUploadJob: Job? = null
 
+    /**
+     * User id that needs a sync once connectivity returns.
+     * Set by [scheduleUpload] when offline; consumed by [retryPendingSync].
+     */
+    @Volatile
+    var pendingUserId: String? = null
+        private set
+
     companion object {
         private const val TAG = "SyncManager"
+    }
+
+    /**
+     * Called by [NetworkMonitor] when connectivity returns.
+     * Retries the queued upload if any.
+     */
+    fun retryPendingSync() {
+        val userId = pendingUserId ?: return
+        pendingUserId = null
+        scheduleUpload(userId)
     }
 
     // ─── DTOs (Supabase row shapes) ──────────────────────────────────────
@@ -134,8 +152,10 @@ class SyncManager(
             delay(3_000L)
             try {
                 uploadAll(userId)
+                pendingUserId = null
             } catch (e: Exception) {
-                Log.e(TAG, "Debounced upload failed", e)
+                Log.e(TAG, "Debounced upload failed — will retry when online", e)
+                pendingUserId = userId
             }
         }
     }

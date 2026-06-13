@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -46,6 +47,7 @@ import com.finora.presentation.accounts.AccountsScreen
 import com.finora.presentation.addtransaction.AddTransactionScreen
 import com.finora.presentation.ai.AiChatScreen
 import com.finora.presentation.auth.AuthScreen
+import com.finora.presentation.components.OfflineBanner
 import com.finora.presentation.goals.GoalsScreen
 import com.finora.presentation.guide.GuideController
 import com.finora.presentation.guide.GuideOverlay
@@ -56,6 +58,7 @@ import com.finora.presentation.scan.ScanReceiptScreen
 import com.finora.presentation.guide.guideTarget
 import com.finora.presentation.home.HomeScreen
 import com.finora.presentation.onboarding.OnboardingScreen
+import com.finora.presentation.recurring.RecurringRulesScreen
 import com.finora.presentation.settings.SettingsScreen
 import com.finora.presentation.transactions.TransactionsScreen
 import io.github.jan.supabase.auth.auth
@@ -75,6 +78,19 @@ fun FinoraNavHost(
     val app = context.applicationContext as FinoraApp
     val settingsRepo = app.container.settings
     val scope = rememberCoroutineScope()
+
+    // ─── Offline monitoring ─────────────────────────────────────────────
+    val isOffline by app.container.networkMonitor.isOnline
+        .collectAsStateWithLifecycle(initialValue = true)
+        .let { online ->
+            // Invert: isOffline = !isOnline
+            androidx.compose.runtime.derivedStateOf { !online.value }
+        }
+
+    // Retry pending sync when connectivity returns
+    LaunchedEffect(isOffline) {
+        if (!isOffline) app.container.syncManager.retryPendingSync()
+    }
 
     // ─── Auth + prefs ────────────────────────────────────────────────────
     val sessionStatus by SupabaseModule.client.auth.sessionStatus
@@ -184,6 +200,11 @@ fun FinoraNavHost(
                     }
                 }
             ) { innerPadding ->
+                // ─── Offline banner ──────────────────────────────
+                Column(modifier = Modifier.padding(innerPadding)) {
+                    OfflineBanner(isOffline = isOffline)
+                }
+
                 val startDest = startRouteOverride ?: when {
                     canAccessApp && onboardingCompleted -> Destination.Home.route
                     canAccessApp -> Destination.Onboarding.route
@@ -269,8 +290,12 @@ fun FinoraNavHost(
                     composable(Destination.Goals.route) { GoalsScreen() }
                     composable(Destination.Settings.route) {
                         SettingsScreen(
-                            onOpenAccounts = { navController.navigate(Destination.Accounts.route) }
+                            onOpenAccounts = { navController.navigate(Destination.Accounts.route) },
+                            onOpenRecurring = { navController.navigate(Destination.RecurringRules.route) }
                         )
+                    }
+                    composable(Destination.RecurringRules.route) {
+                        RecurringRulesScreen(onBack = { navController.popBackStack() })
                     }
                     composable(Destination.Accounts.route) {
                         AccountsScreen(onBack = { navController.popBackStack() })

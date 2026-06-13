@@ -1,7 +1,18 @@
 package com.finora.presentation.ai
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -52,6 +64,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -62,6 +76,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.finora.presentation.AppViewModelProvider
+import com.finora.presentation.theme.LocalFinoraColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,6 +88,7 @@ fun AiChatScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     var input by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
+    val finora = LocalFinoraColors.current
 
     LaunchedEffect(state.messages.size, state.loading) {
         val count = state.messages.size + if (state.loading) 1 else 0
@@ -84,14 +100,35 @@ fun AiChatScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text("AI-аналитика", style = MaterialTheme.typography.titleMedium)
-                        state.provider?.let {
-                            Text(
-                                "через $it",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    Brush.linearGradient(
+                                        listOf(finora.brandStart, finora.brandEnd)
+                                    )
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Rounded.AutoAwesome,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp)
                             )
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Column {
+                            Text("AI-аналитика", style = MaterialTheme.typography.titleMedium)
+                            state.provider?.let {
+                                Text(
+                                    "через $it",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 },
@@ -105,7 +142,7 @@ fun AiChatScreen(
                         Icon(Icons.Rounded.PhotoCamera, contentDescription = "Сканировать чек")
                     }
                     if (state.configured && state.messages.isNotEmpty()) {
-                        TextButton(onClick = { viewModel.clear() }) { Text("Новый анализ") }
+                        TextButton(onClick = { viewModel.clear() }) { Text("Новый") }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -126,7 +163,12 @@ fun AiChatScreen(
             }
 
             if (state.messages.isEmpty() && !state.loading && state.error == null) {
-                AiEmptyState(modifier = Modifier.weight(1f).fillMaxWidth())
+                AiEmptyState(
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    onSuggestion = { suggestion ->
+                        viewModel.send(suggestion)
+                    }
+                )
                 InputBar(
                     value = input,
                     onValueChange = { input = it },
@@ -149,18 +191,33 @@ fun AiChatScreen(
             ) {
                 items(state.messages.size) { index ->
                     val msg = state.messages[index]
-                    if (msg.role == "user") UserBubble(msg.content) else AssistantBubble(msg.content)
+                    AnimatedVisibility(
+                        visible = true,
+                        enter = fadeIn(tween(300)) + scaleIn(
+                            initialScale = 0.92f,
+                            animationSpec = tween(300)
+                        )
+                    ) {
+                        if (msg.role == "user") UserBubble(msg.content)
+                        else AssistantBubble(msg.content)
+                    }
                 }
                 if (state.loading) {
-                    item { TypingBubble() }
+                    item { TypingIndicator() }
                 }
                 state.error?.let { err ->
                     item {
-                        Text(
-                            text = "Ошибка: $err",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
+                        Surface(
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Text(
+                                text = "⚠️ $err",
+                                modifier = Modifier.padding(14.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
                     }
                 }
             }
@@ -179,7 +236,16 @@ fun AiChatScreen(
 }
 
 @Composable
-private fun AiEmptyState(modifier: Modifier = Modifier) {
+private fun AiEmptyState(
+    modifier: Modifier = Modifier,
+    onSuggestion: (String) -> Unit = {}
+) {
+    val suggestions = listOf(
+        "📊 Проанализируй мои расходы",
+        "💡 Как мне сэкономить?",
+        "🎯 Как быстрее достичь целей?"
+    )
+
     Column(
         modifier = modifier.padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -200,35 +266,63 @@ private fun AiEmptyState(modifier: Modifier = Modifier) {
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            "Спроси меня про свои расходы, доходы и цели — или загрузи чек по кнопке камеры сверху, и я добавлю операции.",
+            "Спроси меня про свои расходы, доходы и цели — или загрузи чек по кнопке камеры сверху.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
+        Spacer(Modifier.height(24.dp))
+
+        // Quick suggestion chips
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            suggestions.forEach { text ->
+                Surface(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .clickable { onSuggestion(text.drop(2).trim()) },
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(20.dp)
+                ) {
+                    Text(
+                        text = text,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
+        }
     }
 }
 
 @Composable
 private fun AssistantBubble(text: String) {
+    val finora = LocalFinoraColors.current
     Row(verticalAlignment = Alignment.Top) {
         Box(
             modifier = Modifier
-                .size(32.dp)
+                .size(34.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)),
+                .background(
+                    Brush.linearGradient(listOf(finora.brandStart, finora.brandEnd))
+                ),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 Icons.Rounded.AutoAwesome,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = Color.White,
                 modifier = Modifier.size(18.dp)
             )
         }
         Spacer(Modifier.width(10.dp))
         Surface(
             color = MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(4.dp, 18.dp, 18.dp, 18.dp)
+            shape = RoundedCornerShape(4.dp, 18.dp, 18.dp, 18.dp),
+            shadowElevation = 1.dp
         ) {
             AiMarkdown(
                 text = text,
@@ -240,44 +334,80 @@ private fun AssistantBubble(text: String) {
 
 @Composable
 private fun UserBubble(text: String) {
+    val finora = LocalFinoraColors.current
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
         Surface(
             color = MaterialTheme.colorScheme.primary,
             shape = RoundedCornerShape(18.dp, 4.dp, 18.dp, 18.dp),
-            modifier = Modifier.widthIn(max = 300.dp)
+            modifier = Modifier.widthIn(max = 300.dp),
+            shadowElevation = 1.dp
         ) {
             Text(
                 text = text,
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                 style = MaterialTheme.typography.bodyMedium,
-                color = androidx.compose.ui.graphics.Color.White
+                color = Color.White
             )
         }
     }
 }
 
+/**
+ * Animated 3-dot typing indicator with bouncing dots.
+ */
 @Composable
-private fun TypingBubble() {
+private fun TypingIndicator() {
+    val finora = LocalFinoraColors.current
+    val transition = rememberInfiniteTransition(label = "typing")
+
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
             modifier = Modifier
-                .size(32.dp)
+                .size(34.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)),
+                .background(
+                    Brush.linearGradient(listOf(finora.brandStart, finora.brandEnd))
+                ),
             contentAlignment = Alignment.Center
         ) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(16.dp),
-                strokeWidth = 2.dp,
-                color = MaterialTheme.colorScheme.primary
+            Icon(
+                Icons.Rounded.AutoAwesome,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(18.dp)
             )
         }
         Spacer(Modifier.width(10.dp))
-        Text(
-            "Думаю…",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Surface(
+            color = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(4.dp, 18.dp, 18.dp, 18.dp),
+            shadowElevation = 1.dp
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                repeat(3) { i ->
+                    val anim by transition.animateFloat(
+                        initialValue = 0f,
+                        targetValue = -6f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(400, delayMillis = i * 150, easing = LinearEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "dot_$i"
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .offset(y = anim.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -287,16 +417,25 @@ private fun NotConfigured() {
         modifier = Modifier.fillMaxSize().padding(24.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = "Чтобы включить ИИ, добавь в local.properties ключ одного из провайдеров " +
-                "(OPENROUTER_API_KEY, GROQ_API_KEY или GEMINI_API_KEY) и пересобери приложение.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Image(
+                painter = painterResource(id = com.finora.R.drawable.mascot_think),
+                contentDescription = null,
+                modifier = Modifier.height(160.dp),
+                contentScale = ContentScale.Fit
+            )
+            Spacer(Modifier.height(16.dp))
+            Text(
+                text = "Чтобы включить ИИ, добавь в local.properties ключ одного из провайдеров " +
+                    "(OPENROUTER_API_KEY, GROQ_API_KEY или GEMINI_API_KEY) и пересобери приложение.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun InputBar(
     value: String,
@@ -306,7 +445,8 @@ private fun InputBar(
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 0.dp
+        tonalElevation = 2.dp,
+        shadowElevation = 4.dp
     ) {
         Row(
             modifier = Modifier
@@ -327,16 +467,23 @@ private fun InputBar(
             )
             Spacer(Modifier.width(8.dp))
             val canSend = enabled && value.isNotBlank()
-            IconButton(
-                onClick = onSend,
+            Surface(
+                onClick = { if (canSend) onSend() },
+                modifier = Modifier.size(44.dp),
+                shape = CircleShape,
+                color = if (canSend) MaterialTheme.colorScheme.primary
+                       else MaterialTheme.colorScheme.surfaceVariant,
                 enabled = canSend
             ) {
-                Icon(
-                    Icons.AutoMirrored.Rounded.Send,
-                    contentDescription = "Отправить",
-                    tint = if (canSend) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.AutoMirrored.Rounded.Send,
+                        contentDescription = "Отправить",
+                        tint = if (canSend) Color.White
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
     }

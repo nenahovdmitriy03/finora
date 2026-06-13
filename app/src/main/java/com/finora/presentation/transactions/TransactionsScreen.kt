@@ -29,6 +29,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -187,21 +188,34 @@ private fun CategoryBreakdownCard(
                 subtitle = "За этот месяц операций нет"
             )
         } else {
+            var selectedSlice by remember { mutableStateOf(-1) }
+            val selectedStat = if (selectedSlice in stats.indices) stats[selectedSlice] else null
+
             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 DonutChart(
                     slices = stats.mapIndexed { i, s -> DonutSlice(s.total.toFloat(), Color(chartColorAt(i))) },
+                    onSliceSelected = { selectedSlice = it },
                     center = {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
-                                if (showExpense) "Расходы" else "Доходы",
+                                selectedStat?.category?.name
+                                    ?: if (showExpense) "Расходы" else "Доходы",
                                 style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
                             )
                             Text(
-                                formatMoney(total),
+                                formatMoney(selectedStat?.total ?: total),
                                 style = MaterialTheme.typography.titleLarge,
                                 color = MaterialTheme.colorScheme.onBackground
                             )
+                            if (selectedStat != null) {
+                                Text(
+                                    "${(selectedStat.share * 100).roundToInt()}%",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
                     }
                 )

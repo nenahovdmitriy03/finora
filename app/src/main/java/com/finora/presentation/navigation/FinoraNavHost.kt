@@ -54,7 +54,7 @@ import com.finora.presentation.guide.GuideOverlay
 import com.finora.presentation.guide.GuideScreen
 import com.finora.presentation.guide.GuideStep
 import com.finora.presentation.guide.LocalGuideController
-import com.finora.presentation.scan.ScanReceiptScreen
+
 import com.finora.presentation.guide.guideTarget
 import com.finora.presentation.home.HomeScreen
 import com.finora.presentation.onboarding.OnboardingScreen
@@ -282,14 +282,7 @@ fun FinoraNavHost(
                     }
                     composable(Destination.AiChat.route) {
                         AiChatScreen(
-                            onBack = { navController.popBackStack() },
-                            onScan = { navController.navigate(Destination.Scan.route) }
-                        )
-                    }
-                    composable(Destination.Scan.route) {
-                        ScanReceiptScreen(
-                            onBack = { navController.popBackStack() },
-                            onDone = { navController.popBackStack() }
+                            onBack = { navController.popBackStack() }
                         )
                     }
                     composable(Destination.Goals.route) { GoalsScreen() }

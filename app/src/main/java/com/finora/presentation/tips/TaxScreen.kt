@@ -1,8 +1,12 @@
 package com.finora.presentation.tips
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,8 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.Warning
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,9 +37,13 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -75,39 +82,8 @@ fun TaxScreen(
                 .fillMaxSize()
                 .padding(padding),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // ── Disclaimer ──────────────────────────────────────────────
-            item {
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        verticalAlignment = Alignment.Top
-                    ) {
-                        Icon(
-                            Icons.Rounded.Warning,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(Modifier.width(10.dp))
-                        Text(
-                            text = "Данные носят справочный характер и не являются точным расчётом. " +
-                                "Итоговая сумма вычета зависит от вашего дохода, статуса налогоплательщика и документов. " +
-                                "Для точного расчёта обратитесь в ФНС или к налоговому консультанту.",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            lineHeight = 16.sp
-                        )
-                    }
-                }
-            }
-
             // ── Hero card with potential refund ──────────────────────────
             item {
                 Surface(
@@ -121,10 +97,7 @@ fun TaxScreen(
                             .padding(20.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text(
-                            text = "💰",
-                            fontSize = 40.sp
-                        )
+                        Text(text = "💰", fontSize = 40.sp)
                         Spacer(Modifier.height(8.dp))
                         Text(
                             text = "Возможный возврат за ${state.year}",
@@ -146,7 +119,6 @@ fun TaxScreen(
                         )
                         Spacer(Modifier.height(12.dp))
 
-                        // Progress towards the 150K cap
                         val progress = if (state.socialCap > 0)
                             (state.totalDeductible / state.socialCap).toFloat().coerceIn(0f, 1f)
                         else 0f
@@ -220,210 +192,148 @@ fun TaxScreen(
                 }
             }
 
-            // ── How it works ────────────────────────────────────────────
+            // ── Collapsible: What is a tax deduction? ───────────────────
             item {
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f)
+                CollapsibleSection(
+                    title = "Что такое налоговый вычет?",
+                    emoji = "💡"
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.Top
-                    ) {
-                        Icon(
-                            Icons.Rounded.Info,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.tertiary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        Column {
-                            Text(
-                                text = "Что такое налоговый вычет?",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = "По ст. 219 НК РФ государство возвращает 13% от расходов на лечение, " +
-                                    "обучение, спорт, страхование жизни и благотворительность.\n\n" +
-                                    "Общий лимит социальных вычетов — 150 000 ₽/год (с 2024 г.). " +
-                                    "Максимальный возврат: 19 500 ₽ в год.\n\n" +
-                                    "Вычет доступен официально трудоустроенным плательщикам НДФЛ 13%.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                lineHeight = 18.sp
-                            )
-                        }
-                    }
+                    Text(
+                        text = "По ст. 219 НК РФ государство возвращает 13% от расходов на лечение, " +
+                            "обучение, спорт, страхование жизни и благотворительность.\n\n" +
+                            "Общий лимит социальных вычетов — 150 000 ₽/год (с 2024 г.). " +
+                            "Максимальный возврат: 19 500 ₽ в год.\n\n" +
+                            "Вычет доступен официально трудоустроенным плательщикам НДФЛ 13%.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 18.sp
+                    )
                 }
             }
 
-            // ── Eligible categories ─────────────────────────────────────
+            // ── Collapsible: What counts ────────────────────────────────
             item {
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                CollapsibleSection(
+                    title = "Что подходит для вычета",
+                    emoji = "📋"
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                    ) {
-                        Text(
-                            "Что подходит для вычета:",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        val hints = listOf(
-                            "🏥 Лечение — приёмы врачей, анализы, стоматология, медикаменты по рецепту, ДМС",
-                            "🎓 Обучение — своё (любое), детей до 24 лет (очное), курсы, автошкола, вуз",
-                            "🏋️ Фитнес — абонемент в зал, бассейн, спортивные секции (организация из реестра Минспорта)",
-                            "🛡️ Страхование жизни — договор от 5 лет (не страхование имущества)",
-                            "❤️ Благотворительность — пожертвования НКО (до 25% годового дохода, отдельный лимит)"
-                        )
+                    val hints = listOf(
+                        "🏥 Лечение — приёмы врачей, анализы, стоматология, медикаменты по рецепту, ДМС",
+                        "🎓 Обучение — своё (любое), детей до 24 лет (очное), курсы, автошкола, вуз",
+                        "🏋️ Фитнес — абонемент в зал, бассейн, спортивные секции (организация из реестра Минспорта)",
+                        "🛡️ Страхование жизни — договор от 5 лет (не страхование имущества)",
+                        "❤️ Благотворительность — пожертвования НКО (до 25% годового дохода, отдельный лимит)"
+                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         hints.forEach { hint ->
                             Text(
                                 text = hint,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                lineHeight = 17.sp,
-                                modifier = Modifier.padding(vertical = 4.dp)
+                                lineHeight = 17.sp
                             )
                         }
                     }
                 }
             }
 
-            // ── Step-by-step: how to get the deduction ──────────────────
+            // ── Collapsible: How to apply ───────────────────────────────
             item {
-                Text(
-                    text = "Как оформить вычет",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
+                CollapsibleSection(
+                    title = "Как оформить вычет",
+                    emoji = "📝"
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        StepBlock(
+                            number = "1",
+                            title = "Собери документы",
+                            body = "• Справка 2-НДФЛ от работодателя (или данные в ЛК ФНС)\n" +
+                                "• Договор с клиникой / учебным заведением / фитнес-клубом\n" +
+                                "• Чеки и квитанции об оплате\n" +
+                                "• Лицензия организации (обычно есть на сайте)\n" +
+                                "• Для лечения: справка об оплате мед. услуг\n" +
+                                "• Для обучения детей: свидетельство о рождении, справка об очной форме"
+                        )
+                        StepBlock(
+                            number = "2",
+                            title = "Выбери способ",
+                            body = "Вариант А — через работодателя (быстрее):\n" +
+                                "  Подай заявление в ЛК nalog.gov.ru → получи уведомление → " +
+                                "отнеси в бухгалтерию → с зарплаты перестанут удерживать НДФЛ\n\n" +
+                                "Вариант Б — через декларацию 3-НДФЛ (после конца года):\n" +
+                                "  Заполни 3-НДФЛ в ЛК ФНС или в приложении «Налоги ФЛ» → " +
+                                "приложи документы → подай → деньги вернут на счёт"
+                        )
+                        StepBlock(
+                            number = "3",
+                            title = "Подай онлайн через ЛК ФНС",
+                            body = "1. Зайди на lkfl2.nalog.ru через Госуслуги или по ИНН+пароль\n" +
+                                "2. «Жизненные ситуации» → «Подать декларацию 3-НДФЛ»\n" +
+                                "3. Заполни данные (доходы подтянутся автоматически)\n" +
+                                "4. Выбери тип вычета (социальный), внеси суммы расходов\n" +
+                                "5. Приложи сканы документов\n" +
+                                "6. Подпиши неквалифицированной ЭП (бесплатно, тут же)\n" +
+                                "7. Отправь"
+                        )
+                        StepBlock(
+                            number = "4",
+                            title = "Дождись проверки",
+                            body = "• Камеральная проверка: до 3 месяцев\n" +
+                                "• Заявление на возврат (если не подавал раньше)\n" +
+                                "• Перевод на счёт: до 1 месяца после заявления\n" +
+                                "• Статус можно отслеживать в ЛК ФНС"
+                        )
+                    }
+                }
             }
 
-            // Step 1
-            item { StepCard(
-                number = "1",
-                title = "Собери документы",
-                body = "• Справка 2-НДФЛ от работодателя (или данные в ЛК ФНС)\n" +
-                    "• Договор с клиникой / учебным заведением / фитнес-клубом\n" +
-                    "• Чеки и квитанции об оплате\n" +
-                    "• Лицензия организации (обычно есть на сайте)\n" +
-                    "• Для лечения: справка об оплате мед. услуг (форма из приказа ФНС)\n" +
-                    "• Для обучения детей: свидетельство о рождении, справка об очной форме"
-            )}
-
-            // Step 2
-            item { StepCard(
-                number = "2",
-                title = "Выбери способ оформления",
-                body = "Вариант А — через работодателя (быстрее):\n" +
-                    "  → Подай заявление в ЛК nalog.gov.ru → получи уведомление → " +
-                    "отнеси в бухгалтерию → с зарплаты перестанут удерживать НДФЛ\n\n" +
-                    "Вариант Б — через декларацию 3-НДФЛ (после конца года):\n" +
-                    "  → Заполни 3-НДФЛ в ЛК nalog.gov.ru или в приложении «Налоги ФЛ» → " +
-                    "приложи документы → подай декларацию → деньги вернут на счёт"
-            )}
-
-            // Step 3
-            item { StepCard(
-                number = "3",
-                title = "Подай онлайн через ЛК ФНС",
-                body = "1. Зайди на lkfl2.nalog.ru (Личный кабинет ФНС) через Госуслуги или по ИНН+пароль\n" +
-                    "2. Раздел «Жизненные ситуации» → «Подать декларацию 3-НДФЛ»\n" +
-                    "3. Заполни данные (доходы подтянутся автоматически из справок)\n" +
-                    "4. Выбери тип вычета (социальный) и внеси суммы расходов\n" +
-                    "5. Приложи сканы документов\n" +
-                    "6. Подпиши неквалифицированной ЭП (получается там же бесплатно)\n" +
-                    "7. Отправь — декларация уйдёт в налоговую"
-            )}
-
-            // Step 4
-            item { StepCard(
-                number = "4",
-                title = "Дождись проверки и получи деньги",
-                body = "• Камеральная проверка: до 3 месяцев\n" +
-                    "• После одобрения — подай заявление на возврат (если не подал ранее)\n" +
-                    "• Перевод на банковский счёт: до 1 месяца после заявления\n" +
-                    "• Итого: обычно 2–4 месяца от подачи до получения денег\n\n" +
-                    "Статус проверки можно отслеживать в ЛК ФНС."
-            )}
-
-            // ── Key links ───────────────────────────────────────────────
+            // ── Collapsible: Useful links ───────────────────────────────
             item {
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)
+                CollapsibleSection(
+                    title = "Полезные ресурсы",
+                    emoji = "🌐"
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                    ) {
-                        Text(
-                            "Полезные ресурсы",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        val links = listOf(
-                            "🌐 lkfl2.nalog.ru — Личный кабинет ФНС (подача 3-НДФЛ онлайн)",
-                            "📱 Приложение «Налоги ФЛ» — мобильная версия ЛК ФНС",
-                            "📞 8-800-222-22-22 — горячая линия ФНС (бесплатно)",
-                            "🏢 Ближайшая ИФНС — можно подать документы лично",
-                            "📋 gosuslugi.ru — вход в ЛК ФНС через подтверждённый аккаунт"
-                        )
+                    val links = listOf(
+                        "🌐 lkfl2.nalog.ru — Личный кабинет ФНС (подача 3-НДФЛ онлайн)",
+                        "📱 Приложение «Налоги ФЛ» — мобильная версия ЛК ФНС",
+                        "📞 8-800-222-22-22 — горячая линия ФНС (бесплатно)",
+                        "🏢 Ближайшая ИФНС — можно подать документы лично",
+                        "📋 gosuslugi.ru — вход в ЛК ФНС через подтверждённый аккаунт"
+                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         links.forEach { link ->
                             Text(
                                 text = link,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                lineHeight = 17.sp,
-                                modifier = Modifier.padding(vertical = 3.dp)
+                                lineHeight = 17.sp
                             )
                         }
                     }
                 }
             }
 
-            // ── Important notes ─────────────────────────────────────────
+            // ── Collapsible: Important notes ────────────────────────────
             item {
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                CollapsibleSection(
+                    title = "Важно помнить",
+                    emoji = "⚠️"
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                    ) {
-                        Text(
-                            "⚠️ Важно помнить",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        val notes = listOf(
-                            "• Вычет можно получить за последние 3 года (например, в 2026 — за 2023–2025)",
-                            "• Возврат не может превышать сумму уплаченного НДФЛ за год",
-                            "• Дорогостоящее лечение (код 2) — без лимита 150 000 ₽",
-                            "• Вычет за обучение детей — отдельный лимит 110 000 ₽/год на ребёнка",
-                            "• Самозанятые на НПД не имеют права на вычет (нет НДФЛ 13%)",
-                            "• Сохраняй все чеки и договоры — они нужны для подтверждения"
-                        )
+                    val notes = listOf(
+                        "• Вычет можно получить за последние 3 года (например, в 2026 — за 2023–2025)",
+                        "• Возврат не может превышать сумму уплаченного НДФЛ за год",
+                        "• Дорогостоящее лечение (код 2) — без лимита 150 000 ₽",
+                        "• Вычет за обучение детей — отдельный лимит 110 000 ₽/год на ребёнка",
+                        "• Самозанятые на НПД не имеют права на вычет (нет НДФЛ 13%)",
+                        "• Сохраняй все чеки и договоры — они нужны для подтверждения"
+                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         notes.forEach { note ->
                             Text(
                                 text = note,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                lineHeight = 17.sp,
-                                modifier = Modifier.padding(vertical = 3.dp)
+                                lineHeight = 17.sp
                             )
                         }
                     }
@@ -435,10 +345,9 @@ fun TaxScreen(
                 Text(
                     text = "Информация носит ознакомительный характер и не является налоговой консультацией. " +
                         "Суммы рассчитаны приблизительно на основе категорий расходов. " +
-                        "Для получения точного расчёта обратитесь в ФНС или к квалифицированному налоговому консультанту. " +
-                        "Finora не несёт ответственности за решения, принятые на основе этих данных.",
+                        "Для точного расчёта обратитесь в ФНС или к налоговому консультанту.",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
                     textAlign = TextAlign.Center,
                     lineHeight = 14.sp,
                     modifier = Modifier.fillMaxWidth()
@@ -450,52 +359,110 @@ fun TaxScreen(
     }
 }
 
+/* ── Collapsible section (accordion) ─────────────────────────────────── */
+
 @Composable
-private fun StepCard(number: String, title: String, body: String) {
+private fun CollapsibleSection(
+    title: String,
+    emoji: String,
+    content: @Composable () -> Unit
+) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val arrowRotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        animationSpec = tween(250),
+        label = "arrow"
+    )
+
     Surface(
         shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 1.dp
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-            verticalAlignment = Alignment.Top
-        ) {
-            // Step number badge
-            Box(
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // Header (always visible, clickable)
+            Row(
                 modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded }
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = number,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
-            }
-            Spacer(Modifier.width(14.dp))
-            Column(modifier = Modifier.weight(1f)) {
+                Text(emoji, fontSize = 20.sp)
+                Spacer(Modifier.width(10.dp))
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
                 )
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = body,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    lineHeight = 18.sp
+                Icon(
+                    Icons.Rounded.ExpandMore,
+                    contentDescription = if (expanded) "Свернуть" else "Развернуть",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .size(22.dp)
+                        .rotate(arrowRotation)
                 )
+            }
+
+            // Body (animated expand/collapse)
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically(tween(250)),
+                exit = shrinkVertically(tween(200))
+            ) {
+                Box(
+                    modifier = Modifier.padding(
+                        start = 16.dp,
+                        end = 16.dp,
+                        bottom = 16.dp
+                    )
+                ) {
+                    content()
+                }
             }
         }
     }
 }
+
+/* ── Step block (inside collapsible) ─────────────────────────────────── */
+
+@Composable
+private fun StepBlock(number: String, title: String, body: String) {
+    Row(verticalAlignment = Alignment.Top) {
+        Box(
+            modifier = Modifier
+                .size(26.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = number,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimary
+            )
+        }
+        Spacer(Modifier.width(10.dp))
+        Column {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = body,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 17.sp
+            )
+        }
+    }
+}
+
+/* ── Deduction row ───────────────────────────────────────────────────── */
 
 @Composable
 private fun DeductionRow(item: DeductionItem) {
@@ -510,7 +477,6 @@ private fun DeductionRow(item: DeductionItem) {
                 .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Emoji badge
             Box(
                 modifier = Modifier
                     .size(42.dp)

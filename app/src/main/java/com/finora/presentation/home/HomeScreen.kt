@@ -101,25 +101,6 @@ fun HomeScreen(
                     modifier = Modifier.weight(1f),
                     onClick = onOpenTax
                 )
-                TipMiniCard(
-                    emoji = "📊",
-                    label = "Бюджеты",
-                    modifier = Modifier.weight(1f),
-                    onClick = onOpenBudgets
-                )
-                TipMiniCard(
-                    emoji = "🏆",
-                    label = "Челленджи",
-                    modifier = Modifier.weight(1f),
-                    onClick = onOpenChallenges
-                )
-            }
-        }
-
-        // ── Budget alerts (if any over 80%) ─────────────────────────
-        if (state.budgetAlerts.isNotEmpty()) {
-            item {
-                BudgetAlertsCard(state.budgetAlerts, onClick = onOpenBudgets)
             }
         }
         item {

@@ -190,13 +190,6 @@ fun SettingsScreen(
                     )
                     RowDivider()
                     SettingRow(
-                        icon = Icons.Rounded.AccountBalanceWallet,
-                        title = "Бюджеты",
-                        subtitle = "Лимиты расходов по категориям",
-                        onClick = onOpenBudgets
-                    )
-                    RowDivider()
-                    SettingRow(
                         icon = Icons.Rounded.Bolt,
                         title = "Шаблоны",
                         subtitle = "Быстрый ввод частых операций",

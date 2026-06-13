@@ -272,9 +272,7 @@ fun FinoraNavHost(
                             onSeeGoals = { navController.navigate(Destination.Goals.route) },
                             onOpenAi = { navController.navigate(Destination.AiChat.route) },
                             onOpenTransaction = { id -> navController.navigate(Destination.AddTransaction.create(id)) },
-                            onOpenTax = { navController.navigate(Destination.TaxDeduction.route) },
-                            onOpenBudgets = { navController.navigate(Destination.Budgets.route) },
-                            onOpenChallenges = { navController.navigate(Destination.Challenges.route) }
+                            onOpenTax = { navController.navigate(Destination.TaxDeduction.route) }
                         )
                     }
                     composable(Destination.TaxDeduction.route) {
@@ -295,7 +293,6 @@ fun FinoraNavHost(
                         SettingsScreen(
                             onOpenAccounts = { navController.navigate(Destination.Accounts.route) },
                             onOpenRecurring = { navController.navigate(Destination.RecurringRules.route) },
-                            onOpenBudgets = { navController.navigate(Destination.Budgets.route) },
                             onOpenTemplates = { navController.navigate(Destination.Templates.route) }
                         )
                     }

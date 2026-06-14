@@ -32,6 +32,7 @@ import androidx.compose.material.icons.rounded.TrackChanges
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -84,6 +85,7 @@ fun GoalsScreen(
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()
     var showNewGoalDialog by remember { mutableStateOf(false) }
     var detailGoalId by remember { mutableStateOf<Long?>(null) }
+    var planMonths by remember { mutableStateOf(12) }
     val guideController = LocalGuideController.current
 
     LazyColumn(
@@ -122,6 +124,8 @@ fun GoalsScreen(
                     goal = gws.goal,
                     sources = gws.sources,
                     monthlyPace = gws.monthlyPace,
+                    planMonths = planMonths,
+                    onPlanMonthsChange = { planMonths = it },
                     onClick = { detailGoalId = gws.goal.id }
                 )
             }
@@ -158,6 +162,8 @@ fun GoalsScreen(
                 goal = gws.goal,
                 sources = gws.sources,
                 monthlyPace = gws.monthlyPace,
+                planMonths = planMonths,
+                onPlanMonthsChange = { planMonths = it },
                 accounts = accounts,
                 onDismiss = { detailGoalId = null },
                 onContribute = { accountId, amount ->
@@ -191,6 +197,8 @@ private fun GoalCard(
     goal: Goal,
     sources: List<GoalAccountSummary>,
     monthlyPace: Double,
+    planMonths: Int,
+    onPlanMonthsChange: (Int) -> Unit,
     onClick: () -> Unit
 ) {
     val color = Color(goal.color)
@@ -228,7 +236,13 @@ private fun GoalCard(
             )
         }
 
-        GoalForecastBlock(goal = goal, monthlyPace = monthlyPace, compact = true)
+        GoalForecastBlock(
+            goal = goal,
+            monthlyPace = monthlyPace,
+            planMonths = planMonths,
+            onPlanMonthsChange = onPlanMonthsChange,
+            compact = true
+        )
 
         if (sources.isNotEmpty()) {
             Spacer(Modifier.height(12.dp))
@@ -250,36 +264,45 @@ private fun GoalCard(
 private fun GoalForecastBlock(
     goal: Goal,
     monthlyPace: Double,
+    planMonths: Int,
+    onPlanMonthsChange: (Int) -> Unit,
     compact: Boolean
 ) {
     val remaining = (goal.targetAmount - goal.savedAmount).coerceAtLeast(0.0)
     if (remaining <= 0.0) {
         ForecastRow(
             title = "Цель закрыта",
-            subtitle = "Можно перевести её в завершённые или поставить новую планку."
+            subtitle = "Можно перевести её в завершённые или поставить новую планку.",
+            selectedMonths = planMonths,
+            onPlanMonthsChange = onPlanMonthsChange
         )
         return
     }
 
-    val yearlyPlan = remaining / 12.0
+    val selectedMonths = planMonths.coerceAtLeast(1)
+    val plannedMonthly = remaining / selectedMonths.toDouble()
     val paceText = if (monthlyPace > 0.0) {
         val months = ceil(remaining / monthlyPace).toInt().coerceAtLeast(1)
         "При текущем темпе: примерно $months мес."
     } else {
         "Пополните цель, чтобы увидеть прогноз по темпу."
     }
-    val subtitle = if (compact) {
-        "За год: ${formatMoney(yearlyPlan)}/мес."
-    } else {
-        "За год: ${formatMoney(yearlyPlan)}/мес. $paceText"
-    }
-    ForecastRow(title = "План накопления", subtitle = subtitle)
+    ForecastRow(
+        title = "План накопления",
+        subtitle = "За $selectedMonths мес.: ${formatMoney(plannedMonthly)}/мес.",
+        extra = if (compact) null else paceText,
+        selectedMonths = selectedMonths,
+        onPlanMonthsChange = onPlanMonthsChange
+    )
 }
 
 @Composable
 private fun ForecastRow(
     title: String,
-    subtitle: String
+    subtitle: String,
+    extra: String? = null,
+    selectedMonths: Int,
+    onPlanMonthsChange: (Int) -> Unit
 ) {
     Spacer(Modifier.height(12.dp))
     Column(
@@ -300,6 +323,24 @@ private fun ForecastRow(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        if (extra != null) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                extra,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(6, 12, 24).forEach { months ->
+                FilterChip(
+                    selected = selectedMonths == months,
+                    onClick = { onPlanMonthsChange(months) },
+                    label = { Text("$months мес.") }
+                )
+            }
+        }
     }
 }
 
@@ -349,6 +390,8 @@ private fun GoalDetailScreen(
     goal: Goal,
     sources: List<GoalAccountSummary>,
     monthlyPace: Double,
+    planMonths: Int,
+    onPlanMonthsChange: (Int) -> Unit,
     accounts: List<AccountBalance>,
     onDismiss: () -> Unit,
     onContribute: (accountId: Long, amount: Double) -> Unit,
@@ -465,7 +508,13 @@ private fun GoalDetailScreen(
                     }
 
                     Spacer(Modifier.height(18.dp))
-                    GoalForecastBlock(goal = goal, monthlyPace = monthlyPace, compact = false)
+                    GoalForecastBlock(
+                        goal = goal,
+                        monthlyPace = monthlyPace,
+                        planMonths = planMonths,
+                        onPlanMonthsChange = onPlanMonthsChange,
+                        compact = false
+                    )
 
                     // ─── Action buttons: deposit / withdraw ──────────
                     Spacer(Modifier.height(24.dp))

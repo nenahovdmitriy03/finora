@@ -162,6 +162,9 @@ fun GoalsScreen(
                 onContribute = { accountId, amount ->
                     viewModel.contribute(goalId, accountId, amount)
                 },
+                onSavePlan = { months, monthlyAmount ->
+                    viewModel.savePlan(gws.goal, months, monthlyAmount)
+                },
                 onSave = { name, target, icon, color ->
                     viewModel.saveGoal(
                         id = goalId,
@@ -171,6 +174,8 @@ fun GoalsScreen(
                         color = color,
                         deadline = gws.goal.deadline,
                         saved = gws.goal.savedAmount,
+                        planMonths = gws.goal.planMonths,
+                        plannedMonthlyAmount = gws.goal.plannedMonthlyAmount,
                         linkedAccountId = gws.goal.linkedAccountId
                     )
                 },
@@ -226,9 +231,7 @@ private fun GoalCard(
             )
         }
 
-        GoalForecastBlock(
-            goal = goal
-        )
+        GoalPlanPreview(goal = goal)
 
         if (sources.isNotEmpty()) {
             Spacer(Modifier.height(12.dp))
@@ -247,7 +250,7 @@ private fun GoalCard(
 }
 
 @Composable
-private fun GoalForecastBlock(
+private fun GoalPlanPreview(
     goal: Goal
 ) {
     val remaining = (goal.targetAmount - goal.savedAmount).coerceAtLeast(0.0)
@@ -255,10 +258,16 @@ private fun GoalForecastBlock(
         ForecastSummary(title = "Цель закрыта", subtitle = "Можно поставить новую планку.")
         return
     }
+    val months = goal.planMonths
+    val monthly = goal.plannedMonthlyAmount
+    if (months == null && monthly == null) return
 
     ForecastSummary(
-        title = "План накопления",
-        subtitle = "Откройте цель, чтобы настроить срок и месячный взнос."
+        title = "План",
+        subtitle = listOfNotNull(
+            months?.let { "$it мес." },
+            monthly?.let { "${formatMoney(it)}/мес." }
+        ).joinToString(" • ")
     )
 }
 
@@ -290,11 +299,22 @@ private fun ForecastSummary(
 }
 
 @Composable
-private fun GoalPlanCalculator(goal: Goal) {
+private fun GoalPlanCalculator(
+    goal: Goal,
+    onSavePlan: (Int?, Double?) -> Unit
+) {
     val remaining = (goal.targetAmount - goal.savedAmount).coerceAtLeast(0.0)
-    var monthsText by remember(goal.id, remaining) { mutableStateOf("12") }
-    var monthlyText by remember(goal.id, remaining) {
-        mutableStateOf(if (remaining > 0.0) ((remaining / 12.0).roundToInt()).toString() else "0")
+    var monthsText by remember(goal.id, remaining, goal.planMonths) {
+        mutableStateOf(goal.planMonths?.toString() ?: "12")
+    }
+    var monthlyText by remember(goal.id, remaining, goal.plannedMonthlyAmount, goal.planMonths) {
+        mutableStateOf(
+            goal.plannedMonthlyAmount
+                ?.takeIf { it > 0.0 }
+                ?.roundToInt()
+                ?.toString()
+                ?: if (remaining > 0.0) ((remaining / (goal.planMonths ?: 12).toDouble()).roundToInt()).toString() else "0"
+        )
     }
 
     val months = monthsText.toIntOrNull()?.coerceAtLeast(1)
@@ -372,6 +392,14 @@ private fun GoalPlanCalculator(goal: Goal) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+        Spacer(Modifier.height(12.dp))
+        Button(
+            onClick = { onSavePlan(months, monthly.takeIf { it > 0.0 }) },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = months != null || monthly > 0.0
+        ) {
+            Text("Сохранить план")
+        }
     }
 }
 
@@ -423,6 +451,7 @@ private fun GoalDetailScreen(
     accounts: List<AccountBalance>,
     onDismiss: () -> Unit,
     onContribute: (accountId: Long, amount: Double) -> Unit,
+    onSavePlan: (months: Int?, monthlyAmount: Double?) -> Unit,
     onSave: (name: String, target: Double, icon: String, color: Long) -> Unit,
     onDelete: () -> Unit
 ) {
@@ -536,7 +565,7 @@ private fun GoalDetailScreen(
                     }
 
                     Spacer(Modifier.height(18.dp))
-                    GoalPlanCalculator(goal = goal)
+                    GoalPlanCalculator(goal = goal, onSavePlan = onSavePlan)
 
                     // ─── Action buttons: deposit / withdraw ──────────
                     Spacer(Modifier.height(24.dp))

@@ -44,7 +44,7 @@ import com.finora.data.local.entity.TransferEntity
         TransactionTagEntity::class,
         ChallengeEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -217,6 +217,13 @@ abstract class AppDatabase : RoomDatabase() {
                         createdAt INTEGER NOT NULL
                     )"""
                 )
+            }
+        }
+
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE goals ADD COLUMN planMonths INTEGER")
+                db.execSQL("ALTER TABLE goals ADD COLUMN plannedMonthlyAmount REAL")
             }
         }
     }

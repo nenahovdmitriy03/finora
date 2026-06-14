@@ -97,6 +97,8 @@ data class Goal(
     val color: Long = 0xFF3FB18C,
     val deadline: Long? = null,
     val createdAt: Long = System.currentTimeMillis(),
+    val planMonths: Int? = null,
+    val plannedMonthlyAmount: Double? = null,
     /** @deprecated Kept for Room compat; use GoalContribution instead. */
     val linkedAccountId: Long? = null
 ) {

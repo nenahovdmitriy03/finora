@@ -128,6 +128,8 @@ class SyncManager(
         val icon_key: String,
         val color: Long,
         val deadline: Long? = null,
+        val plan_months: Int? = null,
+        val planned_monthly_amount: Double? = null,
         val created_at: Long
     )
 
@@ -399,7 +401,10 @@ class SyncManager(
                     user_id = userId, name = goal.name,
                     target_amount = goal.targetAmount, saved_amount = goal.savedAmount,
                     icon_key = goal.iconKey, color = goal.color,
-                    deadline = goal.deadline, created_at = goal.createdAt
+                    deadline = goal.deadline,
+                    plan_months = goal.planMonths,
+                    planned_monthly_amount = goal.plannedMonthlyAmount,
+                    created_at = goal.createdAt
                 )
                 val result = pg.from("goals").insert(row) { select() }.decodeSingle<GoalRow>()
                 goalMap[goal.id] = result.id!!
@@ -649,7 +654,9 @@ class SyncManager(
                     id = 0, name = rg.name, targetAmount = rg.target_amount,
                     savedAmount = rg.saved_amount, iconKey = rg.icon_key,
                     color = rg.color, deadline = rg.deadline,
-                    createdAt = rg.created_at
+                    createdAt = rg.created_at,
+                    planMonths = rg.plan_months,
+                    plannedMonthlyAmount = rg.planned_monthly_amount
                 )
                 val localId = db.goalDao().upsert(entity)
                 goalMap[rg.id!!] = localId

@@ -65,6 +65,8 @@ data class GoalEntity(
     val color: Long,
     val deadline: Long?,
     val createdAt: Long,
+    val planMonths: Int? = null,
+    val plannedMonthlyAmount: Double? = null,
     /** @deprecated Kept for backward compat. Use goal_contributions table instead. */
     val linkedAccountId: Long? = null
 )

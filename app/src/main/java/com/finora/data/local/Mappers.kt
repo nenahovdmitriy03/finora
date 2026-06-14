@@ -120,6 +120,8 @@ fun GoalEntity.toDomain() = Goal(
     color = color,
     deadline = deadline,
     createdAt = createdAt,
+    planMonths = planMonths,
+    plannedMonthlyAmount = plannedMonthlyAmount,
     linkedAccountId = linkedAccountId
 )
 
@@ -132,6 +134,8 @@ fun Goal.toEntity() = GoalEntity(
     color = color,
     deadline = deadline,
     createdAt = createdAt,
+    planMonths = planMonths,
+    plannedMonthlyAmount = plannedMonthlyAmount,
     linkedAccountId = linkedAccountId
 )
 

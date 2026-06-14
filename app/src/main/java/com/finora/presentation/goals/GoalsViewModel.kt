@@ -75,6 +75,8 @@ class GoalsViewModel(private val repository: FinanceRepository) : ViewModel() {
         color: Long,
         deadline: Long?,
         saved: Double,
+        planMonths: Int? = null,
+        plannedMonthlyAmount: Double? = null,
         linkedAccountId: Long? = null
     ) {
         if (name.isBlank() || target <= 0.0) return
@@ -88,6 +90,8 @@ class GoalsViewModel(private val repository: FinanceRepository) : ViewModel() {
                     iconKey = iconKey,
                     color = color,
                     deadline = deadline,
+                    planMonths = planMonths,
+                    plannedMonthlyAmount = plannedMonthlyAmount,
                     linkedAccountId = linkedAccountId
                 )
             )
@@ -98,6 +102,17 @@ class GoalsViewModel(private val repository: FinanceRepository) : ViewModel() {
     fun contribute(goalId: Long, accountId: Long, amount: Double) {
         if (amount == 0.0) return
         viewModelScope.launch { repository.contributeToGoal(goalId, accountId, amount) }
+    }
+
+    fun savePlan(goal: Goal, months: Int?, monthlyAmount: Double?) {
+        viewModelScope.launch {
+            repository.updateGoal(
+                goal.copy(
+                    planMonths = months?.takeIf { it > 0 },
+                    plannedMonthlyAmount = monthlyAmount?.takeIf { it > 0.0 }
+                )
+            )
+        }
     }
 
     fun delete(goal: Goal) {

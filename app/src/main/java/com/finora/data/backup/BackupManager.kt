@@ -35,7 +35,7 @@ data class BackupData(
     /** Backup format version — bump when the schema changes. */
     val version: Int = 1,
     /** App data schema (Room) version this backup was taken at. */
-    val dbVersion: Int = 7,
+    val dbVersion: Int = 8,
     /** When the backup was created (epoch millis). */
     val exportedAt: Long = 0L,
     val accounts: List<AccountEntity> = emptyList(),
@@ -126,7 +126,7 @@ class BackupManager(private val db: AppDatabase) {
     companion object {
         private const val TAG = "BackupManager"
         const val CURRENT_VERSION = 1
-        private const val DB_VERSION = 7
+        private const val DB_VERSION = 8
         /** Suggested file name for exported backups. */
         fun suggestedFileName(): String {
             val ts = java.text.SimpleDateFormat("yyyyMMdd_HHmm", java.util.Locale.US)

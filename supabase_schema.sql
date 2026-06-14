@@ -74,6 +74,8 @@ create table public.goals (
     icon_key      text not null default 'target',
     color         bigint not null default 4282298252,
     deadline      bigint,
+    plan_months   integer,
+    planned_monthly_amount double precision,
     created_at    bigint not null,
     updated_at    timestamptz not null default now()
 );

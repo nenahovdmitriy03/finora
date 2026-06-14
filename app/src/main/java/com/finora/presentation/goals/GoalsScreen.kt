@@ -49,9 +49,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -254,47 +256,71 @@ private fun GoalPlanPreview(
     goal: Goal
 ) {
     val remaining = (goal.targetAmount - goal.savedAmount).coerceAtLeast(0.0)
-    if (remaining <= 0.0) {
-        ForecastSummary(title = "Цель закрыта", subtitle = "Можно поставить новую планку.")
-        return
-    }
+    if (remaining <= 0.0) return
     val months = goal.planMonths
     val monthly = goal.plannedMonthlyAmount
     if (months == null && monthly == null) return
 
-    ForecastSummary(
-        title = "План",
-        subtitle = listOfNotNull(
-            months?.let { "$it мес." },
-            monthly?.let { "${formatMoney(it)}/мес." }
-        ).joinToString(" • ")
-    )
-}
-
-@Composable
-private fun ForecastSummary(
-    title: String,
-    subtitle: String
-) {
+    val color = Color(goal.color)
     Spacer(Modifier.height(12.dp))
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f))
-            .padding(horizontal = 12.dp, vertical = 10.dp)
+            .clip(MaterialTheme.shapes.large)
+            .background(
+                Brush.horizontalGradient(
+                    colors = listOf(
+                        color.copy(alpha = 0.16f),
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)
+                    )
+                )
+            )
+            .border(1.dp, color.copy(alpha = 0.20f), MaterialTheme.shapes.large)
+            .padding(horizontal = 12.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            title,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Text(
-            subtitle,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(MaterialTheme.shapes.medium)
+                .background(color.copy(alpha = 0.16f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Rounded.TrackChanges,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = color
+            )
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                "План накопления",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                monthly?.let { "${formatMoney(it)} в месяц" } ?: "Сумма в месяц не задана",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        months?.let {
+            Spacer(Modifier.width(8.dp))
+            Text(
+                "$it мес.",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = color,
+                maxLines = 1
+            )
+        }
     }
 }
 

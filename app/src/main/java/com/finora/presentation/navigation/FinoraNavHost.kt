@@ -46,6 +46,7 @@ import com.finora.data.remote.SupabaseModule
 import com.finora.presentation.accounts.AccountsScreen
 import com.finora.presentation.addtransaction.AddTransactionScreen
 import com.finora.presentation.ai.AiChatScreen
+import com.finora.presentation.analytics.AnalyticsScreen
 import com.finora.presentation.auth.AuthScreen
 import com.finora.presentation.components.OfflineBanner
 import com.finora.presentation.goals.GoalsScreen
@@ -283,6 +284,9 @@ fun FinoraNavHost(
                             onOpenTransaction = { id -> navController.navigate(Destination.AddTransaction.create(id)) }
                         )
                     }
+                    composable(Destination.Analytics.route) {
+                        AnalyticsScreen()
+                    }
                     composable(Destination.AiChat.route) {
                         AiChatScreen(
                             onBack = { navController.popBackStack() }
@@ -357,8 +361,8 @@ private fun FinoraBottomBar(
 
             val guideStep = when (index) {
                 1 -> GuideStep.NAV_TRANSACTIONS
-                2 -> GuideStep.NAV_GOALS
-                3 -> GuideStep.NAV_SETTINGS
+                3 -> GuideStep.NAV_GOALS
+                4 -> GuideStep.NAV_SETTINGS
                 else -> -1
             }
 

@@ -20,10 +20,14 @@ import kotlinx.coroutines.launch
  */
 data class GoalWithSources(
     val goal: Goal,
-    val sources: List<GoalAccountSummary>
+    val sources: List<GoalAccountSummary>,
+    val monthlyPace: Double = 0.0
 )
 
 class GoalsViewModel(private val repository: FinanceRepository) : ViewModel() {
+    private companion object {
+        const val MONTH_MS = 30L * 24L * 60L * 60L * 1000L
+    }
 
     val goals: StateFlow<List<Goal>> = repository.observeGoals()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -42,6 +46,7 @@ class GoalsViewModel(private val repository: FinanceRepository) : ViewModel() {
     ) { goals, contributions, accounts ->
         val accountMap = accounts.associateBy { it.id }
         val contribsByGoal = contributions.groupBy { it.goalId }
+        val recentSince = System.currentTimeMillis() - MONTH_MS
         goals.map { goal ->
             val goalContribs = contribsByGoal[goal.id].orEmpty()
             // Aggregate net amount per account
@@ -54,7 +59,10 @@ class GoalsViewModel(private val repository: FinanceRepository) : ViewModel() {
                     GoalAccountSummary(account = acc, netAmount = net)
                 }
                 .sortedByDescending { it.netAmount }
-            GoalWithSources(goal = goal, sources = byAccount)
+            val monthlyPace = goalContribs
+                .filter { it.date >= recentSince && it.amount > 0.0 }
+                .sumOf { it.amount }
+            GoalWithSources(goal = goal, sources = byAccount, monthlyPace = monthlyPace)
         }
     }.flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())

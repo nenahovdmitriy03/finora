@@ -32,6 +32,9 @@ class SettingsViewModel(
     val authState: StateFlow<AuthRepository.AuthState> = authRepo.authState
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AuthRepository.AuthState.Loading)
 
+    val syncStatus: StateFlow<SyncManager.SyncStatus> = syncManager.status
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SyncManager.SyncStatus.Idle)
+
     private val _isSigningOut = MutableStateFlow(false)
     val isSigningOut: StateFlow<Boolean> = _isSigningOut.asStateFlow()
 
@@ -111,6 +114,13 @@ class SettingsViewModel(
 
     fun setAccent(accent: AccentColor) {
         viewModelScope.launch { settings.setAccentColor(accent) }
+    }
+
+    fun syncNow() {
+        viewModelScope.launch {
+            val userId = authRepo.currentUserId() ?: return@launch
+            runCatching { syncManager.uploadAll(userId) }
+        }
     }
 
     /**

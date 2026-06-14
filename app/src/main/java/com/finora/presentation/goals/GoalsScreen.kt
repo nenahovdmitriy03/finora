@@ -73,6 +73,7 @@ import com.finora.presentation.components.SectionHeader
 import com.finora.presentation.util.MoneyTextField
 import com.finora.presentation.util.finoraPalette
 import com.finora.presentation.util.formatMoney
+import kotlin.math.ceil
 import kotlin.math.roundToInt
 
 @Composable
@@ -120,6 +121,7 @@ fun GoalsScreen(
                 GoalCard(
                     goal = gws.goal,
                     sources = gws.sources,
+                    monthlyPace = gws.monthlyPace,
                     onClick = { detailGoalId = gws.goal.id }
                 )
             }
@@ -155,6 +157,7 @@ fun GoalsScreen(
             GoalDetailScreen(
                 goal = gws.goal,
                 sources = gws.sources,
+                monthlyPace = gws.monthlyPace,
                 accounts = accounts,
                 onDismiss = { detailGoalId = null },
                 onContribute = { accountId, amount ->
@@ -187,6 +190,7 @@ fun GoalsScreen(
 private fun GoalCard(
     goal: Goal,
     sources: List<GoalAccountSummary>,
+    monthlyPace: Double,
     onClick: () -> Unit
 ) {
     val color = Color(goal.color)
@@ -224,6 +228,8 @@ private fun GoalCard(
             )
         }
 
+        GoalForecastBlock(goal = goal, monthlyPace = monthlyPace, compact = true)
+
         if (sources.isNotEmpty()) {
             Spacer(Modifier.height(12.dp))
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -237,6 +243,63 @@ private fun GoalCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun GoalForecastBlock(
+    goal: Goal,
+    monthlyPace: Double,
+    compact: Boolean
+) {
+    val remaining = (goal.targetAmount - goal.savedAmount).coerceAtLeast(0.0)
+    if (remaining <= 0.0) {
+        ForecastRow(
+            title = "Цель закрыта",
+            subtitle = "Можно перевести её в завершённые или поставить новую планку."
+        )
+        return
+    }
+
+    val yearlyPlan = remaining / 12.0
+    val paceText = if (monthlyPace > 0.0) {
+        val months = ceil(remaining / monthlyPace).toInt().coerceAtLeast(1)
+        "При текущем темпе: примерно $months мес."
+    } else {
+        "Пополните цель, чтобы увидеть прогноз по темпу."
+    }
+    val subtitle = if (compact) {
+        "За год: ${formatMoney(yearlyPlan)}/мес."
+    } else {
+        "За год: ${formatMoney(yearlyPlan)}/мес. $paceText"
+    }
+    ForecastRow(title = "План накопления", subtitle = subtitle)
+}
+
+@Composable
+private fun ForecastRow(
+    title: String,
+    subtitle: String
+) {
+    Spacer(Modifier.height(12.dp))
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.medium)
+            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f))
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+    ) {
+        Text(
+            title,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+        Text(
+            subtitle,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
@@ -285,6 +348,7 @@ private fun SourceAccountRow(
 private fun GoalDetailScreen(
     goal: Goal,
     sources: List<GoalAccountSummary>,
+    monthlyPace: Double,
     accounts: List<AccountBalance>,
     onDismiss: () -> Unit,
     onContribute: (accountId: Long, amount: Double) -> Unit,
@@ -399,6 +463,9 @@ private fun GoalDetailScreen(
                             textAlign = TextAlign.Center
                         )
                     }
+
+                    Spacer(Modifier.height(18.dp))
+                    GoalForecastBlock(goal = goal, monthlyPace = monthlyPace, compact = false)
 
                     // ─── Action buttons: deposit / withdraw ──────────
                     Spacer(Modifier.height(24.dp))

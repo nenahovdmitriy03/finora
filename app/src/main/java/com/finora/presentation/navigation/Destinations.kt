@@ -1,6 +1,7 @@
 package com.finora.presentation.navigation
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Analytics
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SwapVert
@@ -12,6 +13,7 @@ sealed class Destination(val route: String) {
     data object Onboarding : Destination("onboarding")
     data object Home : Destination("home")
     data object Transactions : Destination("transactions")
+    data object Analytics : Destination("analytics")
     data object Goals : Destination("goals")
     data object Settings : Destination("settings")
     data object Accounts : Destination("accounts")
@@ -37,6 +39,7 @@ data class BottomItem(
 val bottomItems = listOf(
     BottomItem(Destination.Home, "Главная", Icons.Rounded.Home),
     BottomItem(Destination.Transactions, "Операции", Icons.Rounded.SwapVert),
+    BottomItem(Destination.Analytics, "Аналитика", Icons.Rounded.Analytics),
     BottomItem(Destination.Goals, "Цели", Icons.Rounded.TrackChanges),
     BottomItem(Destination.Settings, "Настройки", Icons.Rounded.Settings)
 )

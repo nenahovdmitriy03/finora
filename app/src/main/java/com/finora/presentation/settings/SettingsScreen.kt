@@ -65,6 +65,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.finora.data.backup.BackupManager
 import com.finora.data.remote.AuthRepository
+import com.finora.data.remote.SyncManager
 import com.finora.domain.model.AccentColor
 import com.finora.domain.model.ThemeMode
 import com.finora.presentation.AppViewModelProvider
@@ -76,6 +77,9 @@ import com.finora.presentation.guide.guideTarget
 import com.finora.presentation.theme.IncomeGreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun SettingsScreen(
@@ -91,6 +95,7 @@ fun SettingsScreen(
     val deleteStatus by viewModel.deleteStatus.collectAsStateWithLifecycle()
     val isSigningOut by viewModel.isSigningOut.collectAsStateWithLifecycle()
     val backupStatus by viewModel.backupStatus.collectAsStateWithLifecycle()
+    val syncStatus by viewModel.syncStatus.collectAsStateWithLifecycle()
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showImportDialog by remember { mutableStateOf(false) }
 
@@ -150,6 +155,14 @@ fun SettingsScreen(
             } else {
                 SignInPrompt(onSignIn = { viewModel.goToRegister() })
             }
+        }
+
+        item {
+            SyncStatusCard(
+                status = syncStatus,
+                signedIn = auth is AuthRepository.AuthState.Authenticated,
+                onSyncNow = viewModel::syncNow
+            )
         }
 
         // ─── Appearance (theme + accent in one card) ─────────────────────
@@ -510,6 +523,89 @@ private fun SignInPrompt(onSignIn: () -> Unit) {
         }
     }
 }
+
+@Composable
+private fun SyncStatusCard(
+    status: SyncManager.SyncStatus,
+    signedIn: Boolean,
+    onSyncNow: () -> Unit
+) {
+    val working = status is SyncManager.SyncStatus.Uploading ||
+        status is SyncManager.SyncStatus.Downloading
+    val title = when {
+        !signedIn -> "Облачная синхронизация"
+        status is SyncManager.SyncStatus.Uploading -> "Сохраняю в облако"
+        status is SyncManager.SyncStatus.Downloading -> "Загружаю из облака"
+        status is SyncManager.SyncStatus.PendingNetwork -> "Ожидает сеть"
+        status is SyncManager.SyncStatus.Error -> "Ошибка синхронизации"
+        else -> "Синхронизация"
+    }
+    val subtitle = when {
+        !signedIn -> "Войдите в аккаунт, чтобы данные сохранялись между устройствами."
+        status is SyncManager.SyncStatus.Synced ->
+            "Последний успех: ${formatSyncTime(status.timestamp)}"
+        status is SyncManager.SyncStatus.Error -> status.message
+        status is SyncManager.SyncStatus.PendingNetwork ->
+            "Данные будут отправлены, когда появится подключение."
+        working -> "Не закрывайте приложение до завершения операции."
+        else -> "Данные сохраняются в Supabase после изменений."
+    }
+    val tint = when (status) {
+        is SyncManager.SyncStatus.Error -> MaterialTheme.colorScheme.error
+        is SyncManager.SyncStatus.PendingNetwork -> MaterialTheme.colorScheme.tertiary
+        is SyncManager.SyncStatus.Synced -> IncomeGreen
+        else -> MaterialTheme.colorScheme.primary
+    }
+
+    FinoraCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(tint.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (working) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.5.dp,
+                        color = tint
+                    )
+                } else {
+                    Icon(Icons.Rounded.Cloud, contentDescription = null, tint = tint)
+                }
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        if (signedIn) {
+            Spacer(Modifier.height(12.dp))
+            Button(
+                onClick = onSyncNow,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !working
+            ) {
+                Text(if (working) "Синхронизация..." else "Синхронизировать сейчас")
+            }
+        }
+    }
+}
+
+private fun formatSyncTime(timestamp: Long): String =
+    SimpleDateFormat("d MMM, HH:mm", Locale("ru", "RU")).format(Date(timestamp))
 
 // ─── Appearance selectors ──────────────────────────────────────────────────
 @Composable

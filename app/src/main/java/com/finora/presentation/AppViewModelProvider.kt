@@ -7,6 +7,7 @@ import com.finora.FinoraApp
 import com.finora.presentation.accounts.AccountsViewModel
 import com.finora.presentation.addtransaction.AddTransactionViewModel
 import com.finora.presentation.ai.AiChatViewModel
+import com.finora.presentation.analytics.AnalyticsViewModel
 import com.finora.presentation.auth.AuthViewModel
 import com.finora.presentation.budget.BudgetViewModel
 import com.finora.presentation.challenges.ChallengesViewModel
@@ -34,6 +35,7 @@ object AppViewModelProvider {
             )
         }
         initializer { TransactionsViewModel(creationApp(this).container.repository) }
+        initializer { AnalyticsViewModel(creationApp(this).container.repository) }
         initializer { AddTransactionViewModel(creationApp(this).container.repository) }
         initializer { GoalsViewModel(creationApp(this).container.repository) }
         initializer { AccountsViewModel(creationApp(this).container.repository) }

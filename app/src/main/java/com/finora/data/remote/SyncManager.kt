@@ -10,6 +10,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -31,6 +34,17 @@ class SyncManager(
     private val client: SupabaseClient,
     private val db: AppDatabase
 ) {
+    sealed interface SyncStatus {
+        data object Idle : SyncStatus
+        data object Uploading : SyncStatus
+        data object Downloading : SyncStatus
+        data object PendingNetwork : SyncStatus
+        data class Synced(val timestamp: Long) : SyncStatus
+        data class Error(val message: String) : SyncStatus
+    }
+
+    private val _status = MutableStateFlow<SyncStatus>(SyncStatus.Idle)
+    val status: StateFlow<SyncStatus> = _status.asStateFlow()
 
     /** Prevents concurrent upload/download operations. */
     private val syncMutex = Mutex()
@@ -225,6 +239,7 @@ class SyncManager(
             } catch (e: Exception) {
                 Log.e(TAG, "Debounced upload failed — will retry when online", e)
                 pendingUserId = userId
+                _status.value = SyncStatus.PendingNetwork
             }
         }
     }
@@ -279,8 +294,10 @@ class SyncManager(
      */
     suspend fun uploadAll(userId: String) = syncMutex.withLock {
         withContext(Dispatchers.IO) {
+            _status.value = SyncStatus.Uploading
             Log.d(TAG, "uploadAll START for user=$userId")
-            val pg = client.postgrest
+            try {
+                val pg = client.postgrest
 
             // 0. Load ALL local data up front so we can guard against data loss.
             val localAccounts = db.accountDao().getAll()
@@ -308,6 +325,7 @@ class SyncManager(
                 localTransactionTags.isEmpty() && localChallenges.isEmpty()
             if (isEffectivelyEmpty) {
                 Log.w(TAG, "uploadAll: local is empty — SKIPPING remote wipe to protect cloud")
+                _status.value = SyncStatus.Synced(System.currentTimeMillis())
                 return@withContext
             }
 
@@ -506,6 +524,11 @@ class SyncManager(
                     "$recurringCount recurring, $budgetCount budgets, " +
                     "$templateCount templates, ${localTags.size} tags, " +
                     "$transactionTagCount txTags, $challengeCount challenges")
+                _status.value = SyncStatus.Synced(System.currentTimeMillis())
+            } catch (e: Exception) {
+                _status.value = SyncStatus.Error(e.message ?: "Sync upload failed")
+                throw e
+            }
         }
     }
 
@@ -520,8 +543,10 @@ class SyncManager(
      */
     suspend fun downloadAll(userId: String): Boolean = syncMutex.withLock {
         withContext(Dispatchers.IO) {
+            _status.value = SyncStatus.Downloading
             Log.d(TAG, "downloadAll START for user=$userId")
-            val pg = client.postgrest
+            try {
+                val pg = client.postgrest
 
             // 1. Fetch all remote data
             val remoteAccounts = pg.from("accounts")
@@ -568,6 +593,7 @@ class SyncManager(
                 remoteTransactionTags.isNotEmpty() || remoteChallenges.isNotEmpty()
             if (!remoteHasRealData) {
                 Log.w(TAG, "downloadAll: remote has no real data — keeping local data")
+                _status.value = SyncStatus.Synced(System.currentTimeMillis())
                 return@withContext false
             }
 
@@ -747,7 +773,12 @@ class SyncManager(
             Log.d(TAG, "downloadAll DONE: wrote ${remoteAccounts.size} accounts, " +
                     "${remoteCategories.size} categories, ${remoteTransactions.size} tx, " +
                     "${remoteTemplates.size} templates, ${remoteRecurringRules.size} recurring")
+                _status.value = SyncStatus.Synced(System.currentTimeMillis())
             return@withContext true
+            } catch (e: Exception) {
+                _status.value = SyncStatus.Error(e.message ?: "Sync download failed")
+                throw e
+            }
         }
     }
 

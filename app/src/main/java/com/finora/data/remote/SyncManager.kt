@@ -139,6 +139,75 @@ class SyncManager(
         val created_at: Long
     )
 
+    @Serializable
+    data class RecurringRuleRow(
+        val id: String? = null,
+        val user_id: String,
+        val name: String,
+        val amount: Double,
+        val type: String,
+        val category_id: String,
+        val account_id: String,
+        val period_days: Int,
+        val last_executed_at: Long? = null,
+        val created_at: Long,
+        val enabled: Boolean = true
+    )
+
+    @Serializable
+    data class BudgetRow(
+        val id: String? = null,
+        val user_id: String,
+        val category_id: String,
+        val limit_amount: Double,
+        val period_days: Int = 30,
+        val created_at: Long
+    )
+
+    @Serializable
+    data class TemplateRow(
+        val id: String? = null,
+        val user_id: String,
+        val name: String,
+        val amount: Double,
+        val type: String,
+        val category_id: String? = null,
+        val account_id: String? = null,
+        val note: String = "",
+        val created_at: Long
+    )
+
+    @Serializable
+    data class TagRow(
+        val id: String? = null,
+        val user_id: String,
+        val name: String,
+        val color: Long
+    )
+
+    @Serializable
+    data class TransactionTagRow(
+        val user_id: String,
+        val transaction_id: String,
+        val tag_id: String
+    )
+
+    @Serializable
+    data class ChallengeRow(
+        val id: String? = null,
+        val user_id: String,
+        val title: String,
+        val description: String,
+        val emoji: String = "\uD83C\uDFAF",
+        val target_days: Int,
+        val target_amount: Double? = null,
+        val category_id: String? = null,
+        val start_date: Long,
+        val end_date: Long,
+        val completed: Boolean = false,
+        val created_at: Long
+    )
+
     // ─── Debounced upload trigger ────────────────────────────────────────
 
     /**
@@ -220,6 +289,12 @@ class SyncManager(
             val localGoals = db.goalDao().observeAll().first()
             val localContribs = db.goalContributionDao().observeAll().first()
             val localTransfers = db.transferDao().observeAll().first()
+            val localRecurringRules = db.recurringRuleDao().getAll()
+            val localBudgets = db.budgetDao().getAll()
+            val localTemplates = db.templateDao().getAll()
+            val localTags = db.tagDao().getAll()
+            val localTransactionTags = db.transactionTagDao().getAll()
+            val localChallenges = db.challengeDao().getAll()
 
             // SAFETY GUARD: never let an empty local DB wipe a populated cloud.
             // Categories alone are auto-seeded defaults and don't count as real data.
@@ -227,13 +302,22 @@ class SyncManager(
             // would DELETE every remote row → full data loss. Now an empty local simply
             // refuses to push a destructive "delete everything" to the cloud.
             val isEffectivelyEmpty = localAccounts.isEmpty() && localTx.isEmpty() &&
-                localGoals.isEmpty() && localContribs.isEmpty() && localTransfers.isEmpty()
+                localGoals.isEmpty() && localContribs.isEmpty() && localTransfers.isEmpty() &&
+                localRecurringRules.isEmpty() && localBudgets.isEmpty() &&
+                localTemplates.isEmpty() && localTags.isEmpty() &&
+                localTransactionTags.isEmpty() && localChallenges.isEmpty()
             if (isEffectivelyEmpty) {
                 Log.w(TAG, "uploadAll: local is empty — SKIPPING remote wipe to protect cloud")
                 return@withContext
             }
 
             // 1. Delete existing remote data (reverse dependency order)
+            pg.from("transaction_tags").delete { filter { eq("user_id", userId) } }
+            pg.from("challenges").delete { filter { eq("user_id", userId) } }
+            pg.from("templates").delete { filter { eq("user_id", userId) } }
+            pg.from("budgets").delete { filter { eq("user_id", userId) } }
+            pg.from("recurring_rules").delete { filter { eq("user_id", userId) } }
+            pg.from("tags").delete { filter { eq("user_id", userId) } }
             pg.from("goal_contributions").delete { filter { eq("user_id", userId) } }
             pg.from("transfers").delete { filter { eq("user_id", userId) } }
             pg.from("transactions").delete { filter { eq("user_id", userId) } }
@@ -273,6 +357,7 @@ class SyncManager(
             Log.d(TAG, "uploadAll: uploaded ${localCategories.size} categories")
 
             // 4. Upload transactions (remap accountId, categoryId)
+            val transactionMap = mutableMapOf<Long, String>()
             var txCount = 0
             for (tx in localTx) {
                 val remoteAccId = accountMap[tx.accountId] ?: continue
@@ -282,7 +367,8 @@ class SyncManager(
                     account_id = remoteAccId, category_id = remoteCatId,
                     note = tx.note, date = tx.date, created_at = tx.createdAt
                 )
-                pg.from("transactions").insert(row)
+                val result = pg.from("transactions").insert(row) { select() }.decodeSingle<TransactionRow>()
+                transactionMap[tx.id] = result.id!!
                 txCount++
             }
             Log.d(TAG, "uploadAll: uploaded $txCount transactions")
@@ -328,7 +414,98 @@ class SyncManager(
                 pg.from("transfers").insert(row)
                 transferCount++
             }
-            Log.d(TAG, "uploadAll DONE: $txCount tx, ${localGoals.size} goals, $contribCount contribs, $transferCount transfers")
+
+            // 8. Upload recurring rules (remap categoryId, accountId)
+            var recurringCount = 0
+            for (rule in localRecurringRules) {
+                val remoteCatId = categoryMap[rule.categoryId] ?: continue
+                val remoteAccId = accountMap[rule.accountId] ?: continue
+                val row = RecurringRuleRow(
+                    user_id = userId, name = rule.name, amount = rule.amount,
+                    type = rule.type, category_id = remoteCatId, account_id = remoteAccId,
+                    period_days = rule.periodDays, last_executed_at = rule.lastExecutedAt,
+                    created_at = rule.createdAt, enabled = rule.enabled
+                )
+                pg.from("recurring_rules").insert(row)
+                recurringCount++
+            }
+
+            // 9. Upload budgets (remap categoryId)
+            var budgetCount = 0
+            for (budget in localBudgets) {
+                val remoteCatId = categoryMap[budget.categoryId] ?: continue
+                val row = BudgetRow(
+                    user_id = userId, category_id = remoteCatId,
+                    limit_amount = budget.limitAmount, period_days = budget.periodDays,
+                    created_at = budget.createdAt
+                )
+                pg.from("budgets").insert(row)
+                budgetCount++
+            }
+
+            // 10. Upload templates (remap optional categoryId/accountId)
+            var templateCount = 0
+            for (template in localTemplates) {
+                val remoteCatId = template.categoryId?.let { categoryMap[it] }
+                val remoteAccId = template.accountId?.let { accountMap[it] }
+                val row = TemplateRow(
+                    user_id = userId, name = template.name, amount = template.amount,
+                    type = template.type, category_id = remoteCatId,
+                    account_id = remoteAccId, note = template.note,
+                    created_at = template.createdAt
+                )
+                pg.from("templates").insert(row)
+                templateCount++
+            }
+
+            // 11. Upload tags, build localId -> UUID map
+            val tagMap = mutableMapOf<Long, String>()
+            for (tag in localTags) {
+                val row = TagRow(user_id = userId, name = tag.name, color = tag.color)
+                val result = pg.from("tags").insert(row) { select() }.decodeSingle<TagRow>()
+                tagMap[tag.id] = result.id!!
+            }
+
+            // 12. Upload transaction-tag links (remap both sides)
+            var transactionTagCount = 0
+            for (link in localTransactionTags) {
+                val remoteTxId = transactionMap[link.transactionId] ?: continue
+                val remoteTagId = tagMap[link.tagId] ?: continue
+                val row = TransactionTagRow(
+                    user_id = userId,
+                    transaction_id = remoteTxId,
+                    tag_id = remoteTagId
+                )
+                pg.from("transaction_tags").insert(row)
+                transactionTagCount++
+            }
+
+            // 13. Upload challenges (remap optional categoryId)
+            var challengeCount = 0
+            for (challenge in localChallenges) {
+                val remoteCatId = challenge.categoryId?.let { categoryMap[it] }
+                val row = ChallengeRow(
+                    user_id = userId,
+                    title = challenge.title,
+                    description = challenge.description,
+                    emoji = challenge.emoji,
+                    target_days = challenge.targetDays,
+                    target_amount = challenge.targetAmount,
+                    category_id = remoteCatId,
+                    start_date = challenge.startDate,
+                    end_date = challenge.endDate,
+                    completed = challenge.completed,
+                    created_at = challenge.createdAt
+                )
+                pg.from("challenges").insert(row)
+                challengeCount++
+            }
+
+            Log.d(TAG, "uploadAll DONE: $txCount tx, ${localGoals.size} goals, " +
+                    "$contribCount contribs, $transferCount transfers, " +
+                    "$recurringCount recurring, $budgetCount budgets, " +
+                    "$templateCount templates, ${localTags.size} tags, " +
+                    "$transactionTagCount txTags, $challengeCount challenges")
         }
     }
 
@@ -359,18 +536,36 @@ class SyncManager(
                 .select { filter { eq("user_id", userId) } }.decodeList<GoalContributionRow>()
             val remoteTransfers = pg.from("transfers")
                 .select { filter { eq("user_id", userId) } }.decodeList<TransferRow>()
+            val remoteRecurringRules = pg.from("recurring_rules")
+                .select { filter { eq("user_id", userId) } }.decodeList<RecurringRuleRow>()
+            val remoteBudgets = pg.from("budgets")
+                .select { filter { eq("user_id", userId) } }.decodeList<BudgetRow>()
+            val remoteTemplates = pg.from("templates")
+                .select { filter { eq("user_id", userId) } }.decodeList<TemplateRow>()
+            val remoteTags = pg.from("tags")
+                .select { filter { eq("user_id", userId) } }.decodeList<TagRow>()
+            val remoteTransactionTags = pg.from("transaction_tags")
+                .select { filter { eq("user_id", userId) } }.decodeList<TransactionTagRow>()
+            val remoteChallenges = pg.from("challenges")
+                .select { filter { eq("user_id", userId) } }.decodeList<ChallengeRow>()
 
             Log.d(TAG, "downloadAll: remote has ${remoteAccounts.size} accounts, " +
                     "${remoteCategories.size} categories, ${remoteTransactions.size} tx, " +
                     "${remoteGoals.size} goals, ${remoteContribs.size} contribs, " +
-                    "${remoteTransfers.size} transfers")
+                    "${remoteTransfers.size} transfers, ${remoteRecurringRules.size} recurring, " +
+                    "${remoteBudgets.size} budgets, ${remoteTemplates.size} templates, " +
+                    "${remoteTags.size} tags, ${remoteChallenges.size} challenges")
 
             // Treat remote as authoritative ONLY if it has real data (accounts,
             // transactions or goals). Categories alone are auto-seeded defaults and
             // can be left behind by a half-finished/interrupted upload — in that case
             // we must NOT clobber local data with a near-empty cloud.
             val remoteHasRealData = remoteAccounts.isNotEmpty() ||
-                remoteTransactions.isNotEmpty() || remoteGoals.isNotEmpty()
+                remoteTransactions.isNotEmpty() || remoteGoals.isNotEmpty() ||
+                remoteContribs.isNotEmpty() || remoteTransfers.isNotEmpty() ||
+                remoteRecurringRules.isNotEmpty() || remoteBudgets.isNotEmpty() ||
+                remoteTemplates.isNotEmpty() || remoteTags.isNotEmpty() ||
+                remoteTransactionTags.isNotEmpty() || remoteChallenges.isNotEmpty()
             if (!remoteHasRealData) {
                 Log.w(TAG, "downloadAll: remote has no real data — keeping local data")
                 return@withContext false
@@ -408,6 +603,7 @@ class SyncManager(
             }
 
             // 5. Insert transactions (remap FK UUIDs → local ids)
+            val transactionMap = mutableMapOf<String, Long>()
             for (rt in remoteTransactions) {
                 val localAccId = accountMap[rt.account_id] ?: continue
                 val localCatId = rt.category_id?.let { categoryMap[it] }
@@ -416,7 +612,8 @@ class SyncManager(
                     accountId = localAccId, categoryId = localCatId,
                     note = rt.note, date = rt.date, createdAt = rt.created_at
                 )
-                db.transactionDao().upsert(entity)
+                val localId = db.transactionDao().upsert(entity)
+                transactionMap[rt.id!!] = localId
             }
 
             // 6. Insert goals
@@ -455,8 +652,101 @@ class SyncManager(
                 db.transferDao().upsert(entity)
             }
 
+            // 9. Insert recurring rules
+            for (rr in remoteRecurringRules) {
+                val localCatId = categoryMap[rr.category_id] ?: continue
+                val localAccId = accountMap[rr.account_id] ?: continue
+                val entity = com.finora.data.local.entity.RecurringRuleEntity(
+                    id = 0,
+                    name = rr.name,
+                    amount = rr.amount,
+                    type = rr.type,
+                    categoryId = localCatId,
+                    accountId = localAccId,
+                    periodDays = rr.period_days,
+                    lastExecutedAt = rr.last_executed_at,
+                    createdAt = rr.created_at,
+                    enabled = rr.enabled
+                )
+                db.recurringRuleDao().upsert(entity)
+            }
+
+            // 10. Insert budgets
+            for (rb in remoteBudgets) {
+                val localCatId = categoryMap[rb.category_id] ?: continue
+                val entity = com.finora.data.local.entity.BudgetEntity(
+                    id = 0,
+                    categoryId = localCatId,
+                    limitAmount = rb.limit_amount,
+                    periodDays = rb.period_days,
+                    createdAt = rb.created_at
+                )
+                db.budgetDao().upsert(entity)
+            }
+
+            // 11. Insert templates
+            for (rt in remoteTemplates) {
+                val localCatId = rt.category_id?.let { categoryMap[it] }
+                val localAccId = rt.account_id?.let { accountMap[it] }
+                val entity = com.finora.data.local.entity.TemplateEntity(
+                    id = 0,
+                    name = rt.name,
+                    amount = rt.amount,
+                    type = rt.type,
+                    categoryId = localCatId,
+                    accountId = localAccId,
+                    note = rt.note,
+                    createdAt = rt.created_at
+                )
+                db.templateDao().upsert(entity)
+            }
+
+            // 12. Insert tags
+            val tagMap = mutableMapOf<String, Long>()
+            for (rt in remoteTags) {
+                val entity = com.finora.data.local.entity.TagEntity(
+                    id = 0,
+                    name = rt.name,
+                    color = rt.color
+                )
+                val localId = db.tagDao().upsert(entity)
+                tagMap[rt.id!!] = localId
+            }
+
+            // 13. Insert transaction-tag links
+            for (rtl in remoteTransactionTags) {
+                val localTxId = transactionMap[rtl.transaction_id] ?: continue
+                val localTagId = tagMap[rtl.tag_id] ?: continue
+                db.transactionTagDao().insert(
+                    com.finora.data.local.entity.TransactionTagEntity(
+                        transactionId = localTxId,
+                        tagId = localTagId
+                    )
+                )
+            }
+
+            // 14. Insert challenges
+            for (rc in remoteChallenges) {
+                val localCatId = rc.category_id?.let { categoryMap[it] }
+                val entity = com.finora.data.local.entity.ChallengeEntity(
+                    id = 0,
+                    title = rc.title,
+                    description = rc.description,
+                    emoji = rc.emoji,
+                    targetDays = rc.target_days,
+                    targetAmount = rc.target_amount,
+                    categoryId = localCatId,
+                    startDate = rc.start_date,
+                    endDate = rc.end_date,
+                    completed = rc.completed,
+                    createdAt = rc.created_at
+                )
+                db.challengeDao().upsert(entity)
+            }
+
             Log.d(TAG, "downloadAll DONE: wrote ${remoteAccounts.size} accounts, " +
-                    "${remoteCategories.size} categories, ${remoteTransactions.size} tx")
+                    "${remoteCategories.size} categories, ${remoteTransactions.size} tx, " +
+                    "${remoteTemplates.size} templates, ${remoteRecurringRules.size} recurring")
             return@withContext true
         }
     }
@@ -489,6 +779,12 @@ class SyncManager(
         withContext(Dispatchers.IO) {
             Log.d(TAG, "deleteAllUserData for user=$userId")
             val pg = client.postgrest
+            pg.from("transaction_tags").delete { filter { eq("user_id", userId) } }
+            pg.from("challenges").delete { filter { eq("user_id", userId) } }
+            pg.from("templates").delete { filter { eq("user_id", userId) } }
+            pg.from("budgets").delete { filter { eq("user_id", userId) } }
+            pg.from("recurring_rules").delete { filter { eq("user_id", userId) } }
+            pg.from("tags").delete { filter { eq("user_id", userId) } }
             pg.from("goal_contributions").delete { filter { eq("user_id", userId) } }
             pg.from("transfers").delete { filter { eq("user_id", userId) } }
             pg.from("transactions").delete { filter { eq("user_id", userId) } }

@@ -5,6 +5,7 @@ import com.finora.data.local.DefaultData
 import com.finora.data.local.toDomain
 import com.finora.data.local.toEntity
 import com.finora.data.local.entity.TransactionTagEntity
+import com.finora.data.local.entity.RecurringRuleEntity
 import com.finora.data.remote.AuthRepository
 import com.finora.data.remote.SyncManager
 import com.finora.domain.model.Account
@@ -51,6 +52,7 @@ class FinanceRepository(
     private val tagDao = db.tagDao()
     private val transactionTagDao = db.transactionTagDao()
     private val challengeDao = db.challengeDao()
+    private val recurringRuleDao = db.recurringRuleDao()
 
     private companion object {
         const val DAY_MS = 86_400_000L
@@ -419,10 +421,12 @@ class FinanceRepository(
         }
 
     suspend fun addBudget(budget: Budget): Long =
-        budgetDao.upsert(budget.toEntity())
+        budgetDao.upsert(budget.toEntity()).also { triggerCloudSync() }
 
-    suspend fun deleteBudget(budget: Budget) =
+    suspend fun deleteBudget(budget: Budget) {
         budgetDao.delete(budget.toEntity())
+        triggerCloudSync()
+    }
 
     // ─── Templates ──────────────────────────────────────────────────────────
 
@@ -430,10 +434,12 @@ class FinanceRepository(
         templateDao.observeAll().map { list -> list.map { it.toDomain() } }
 
     suspend fun addTemplate(template: Template): Long =
-        templateDao.upsert(template.toEntity())
+        templateDao.upsert(template.toEntity()).also { triggerCloudSync() }
 
-    suspend fun deleteTemplate(template: Template) =
+    suspend fun deleteTemplate(template: Template) {
         templateDao.delete(template.toEntity())
+        triggerCloudSync()
+    }
 
     // ─── Tags ───────────────────────────────────────────────────────────────
 
@@ -441,11 +447,12 @@ class FinanceRepository(
         tagDao.observeAll().map { list -> list.map { it.toDomain() } }
 
     suspend fun addTag(tag: Tag): Long =
-        tagDao.upsert(tag.toEntity())
+        tagDao.upsert(tag.toEntity()).also { triggerCloudSync() }
 
     suspend fun deleteTag(tag: Tag) {
         transactionTagDao.deleteByTag(tag.id)
         tagDao.delete(tag.toEntity())
+        triggerCloudSync()
     }
 
     /** Replace all tag links for a transaction with the given set. */
@@ -454,6 +461,7 @@ class FinanceRepository(
         tagIds.forEach { tagId ->
             transactionTagDao.insert(TransactionTagEntity(transactionId, tagId))
         }
+        triggerCloudSync()
     }
 
     fun observeTransactionTagIds(transactionId: Long): Flow<List<Long>> =
@@ -472,13 +480,30 @@ class FinanceRepository(
             .map { list -> list.map { it.toDomain() } }
 
     suspend fun addChallenge(challenge: Challenge): Long =
-        challengeDao.upsert(challenge.toEntity())
+        challengeDao.upsert(challenge.toEntity()).also { triggerCloudSync() }
 
-    suspend fun deleteChallenge(challenge: Challenge) =
+    suspend fun deleteChallenge(challenge: Challenge) {
         challengeDao.delete(challenge.toEntity())
+        triggerCloudSync()
+    }
 
-    suspend fun completeChallenge(id: Long) =
+    suspend fun completeChallenge(id: Long) {
         challengeDao.markCompleted(id)
+        triggerCloudSync()
+    }
+
+    suspend fun addRecurringRule(rule: RecurringRuleEntity): Long =
+        recurringRuleDao.upsert(rule).also { triggerCloudSync() }
+
+    suspend fun updateRecurringRule(rule: RecurringRuleEntity) {
+        recurringRuleDao.upsert(rule)
+        triggerCloudSync()
+    }
+
+    suspend fun deleteRecurringRule(rule: RecurringRuleEntity) {
+        recurringRuleDao.delete(rule)
+        triggerCloudSync()
+    }
 
     /**
      * Total spending in a category between two timestamps.

@@ -52,7 +52,7 @@ class RecurringRulesViewModel(
         startDateMillis: Long
     ) {
         viewModelScope.launch {
-            db.recurringRuleDao().upsert(
+            repository.addRecurringRule(
                 RecurringRuleEntity(
                     name = name,
                     amount = amount,
@@ -84,13 +84,13 @@ class RecurringRulesViewModel(
 
     fun toggleRule(rule: RecurringRuleEntity) {
         viewModelScope.launch {
-            db.recurringRuleDao().upsert(rule.copy(enabled = !rule.enabled))
+            repository.updateRecurringRule(rule.copy(enabled = !rule.enabled))
         }
     }
 
     fun deleteRule(rule: RecurringRuleEntity) {
         viewModelScope.launch {
-            db.recurringRuleDao().delete(rule)
+            repository.deleteRecurringRule(rule)
         }
     }
 }
